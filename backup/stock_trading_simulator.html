@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模拟器</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // 股票模拟器类
+        class StockTradingSimulator {
+            constructor(totalCapital, buyAmountPerPoint, sellThreshold, sellRatio) {
+                this.originalCapital = totalCapital;
+                this.currentStageCapital = totalCapital;
+                this.remainingCapital = totalCapital;
+                this.buyAmountPerPoint = buyAmountPerPoint;
+                this.sellThreshold = sellThreshold;
+                this.sellRatio = sellRatio;
+
+                this.positions = [];
+                this.currentPrice = 1;
+                this.totalInvested = 0;
+                this.tradingLog = [];
+                this.stage = 1;
+                this.stageResults = [];
+                this.dayCounter = 0;
+                this.dailyTradeInfo = '';
+                this.dailyResults = [];
+            }
+
+            processDailyChange(changePercent) {
+                this.dayCounter++;
+                this.dailyTradeInfo = '';
+
+                const previousPrice = this.currentPrice;
+                this.currentPrice = previousPrice * (1 + changePercent / 100);
+
+                if (changePercent < 0 && this.remainingCapital > 0) {
+                    this.buyStock(Math.abs(changePercent));
+                }
+
+                if (changePercent > 0) {
+                    this.checkSellCondition();
+                }
+
+                this.logDailyStatus(changePercent);
+            }
+
+            buyStock(dropPercent) {
+                const buyAmount = Math.floor(dropPercent) * this.buyAmountPerPoint;
+                const actualBuyAmount = Math.min(buyAmount, this.remainingCapital);
+
+                if (actualBuyAmount > 0) {
+                    const shares = actualBuyAmount / this.currentPrice;
+
+                    this.positions.push({
+                        price: this.currentPrice,
+                        amount: actualBuyAmount,
+                        shares: shares
+                    });
+
+                    this.remainingCapital -= actualBuyAmount;
+                    this.totalInvested += actualBuyAmount;
+                    this.dailyTradeInfo = `买入${actualBuyAmount.toFixed(0)}元`;
+
+                    this.tradingLog.push({
+                        type: 'BUY',
+                        price: this.currentPrice,
+                        amount: actualBuyAmount,
+                        shares: shares,
+                        remainingCapital: this.remainingCapital
+                    });
+                }
+            }
+
+            checkSellCondition() {
+                if (this.positions.length === 0) return;
+
+                const totalShares = this.positions.reduce((sum, pos) => sum + pos.shares, 0);
+                const totalAmount = this.positions.reduce((sum, pos) => sum + pos.amount, 0);
+                const avgBuyPrice = totalAmount / totalShares;
+                const currentGainPercent = ((this.currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
+
+                if (currentGainPercent > this.sellThreshold) {
+                    this.sellPositions(totalShares, avgBuyPrice);
+                }
+            }
+
+            sellPositions(totalShares, avgBuyPrice) {
+                const sellShares = totalShares * (this.sellRatio / 100);
+                const sellAmount = sellShares * this.currentPrice;
+                const soldInvestment = (sellShares / totalShares) * this.totalInvested;
+                const profit = sellAmount - soldInvestment;
+
+                this.dailyTradeInfo = `卖出${this.sellRatio}%(${sellAmount.toFixed(0)}元,盈利${profit.toFixed(0)}元)`;
+
+                // 按比例减少持仓
+                this.positions = this.positions.map(pos => ({
+                    ...pos,
+                    shares: pos.shares * (1 - this.sellRatio / 100),
+                    amount: pos.amount * (1 - this.sellRatio / 100)
+                })).filter(pos => pos.shares > 0.01);
+
+                this.remainingCapital += sellAmount;
+                this.totalInvested -= soldInvestment;
+
+                this.tradingLog.push({
+                    type: 'SELL_PARTIAL',
+                    stage: this.stage,
+                    price: this.currentPrice,
+                    shares: sellShares,
+                    amount: sellAmount,
+                    profit: profit,
+                    sellRatio: this.sellRatio,
+                    avgBuyPrice: avgBuyPrice,
+                    sellPrice: this.currentPrice
+                });
+            }
+
+            logDailyStatus(changePercent) {
+                const totalShares = this.positions.reduce((sum, pos) => sum + pos.shares, 0);
+                const currentValue = totalShares * this.currentPrice;
+                const totalAssets = this.remainingCapital + currentValue;
+
+                let currentGainPercent = 0;
+                if (totalShares > 0) {
+                    const totalAmount = this.positions.reduce((sum, pos) => sum + pos.amount, 0);
+                    const avgBuyPrice = totalAmount / totalShares;
+                    currentGainPercent = ((this.currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
+                }
+
+                this.dailyResults.push({
+                    day: this.dayCounter,
+                    changePercent: changePercent,
+                    currentGainPercent: currentGainPercent,
+                    holdingValue: currentValue,
+                    totalAssets: totalAssets,
+                    tradeInfo: this.dailyTradeInfo,
+                    currentPrice: this.currentPrice,
+                    remainingCapital: this.remainingCapital
+                });
+            }
+
+            simulate(dailyChanges) {
+                this.dailyResults = [];
+                dailyChanges.forEach((change) => {
+                    this.processDailyChange(change);
+                });
+                return this.getFinalResult();
+            }
+
+            getFinalResult() {
+                const totalShares = this.positions.reduce((sum, pos) => sum + pos.shares, 0);
+                const currentValue = totalShares * this.currentPrice;
+                const totalAssets = this.remainingCapital + currentValue;
+                const totalReturn = totalAssets - this.originalCapital;
+                const returnPercent = (totalReturn / this.originalCapital) * 100;
+                const totalPriceChange = ((this.currentPrice - 1) / 1) * 100;
+
+                const sellTrades = this.tradingLog.filter(log => log.type === 'SELL_PARTIAL');
+                const totalTradeProfit = sellTrades.reduce((sum, trade) => sum + trade.profit, 0);
+
+                return {
+                    totalPriceChange,
+                    totalReturn,
+                    returnPercent,
+                    totalTradeProfit,
+                    buyCount: this.tradingLog.filter(log => log.type === 'BUY').length,
+                    sellCount: sellTrades.length,
+                    dailyResults: this.dailyResults
+                };
+            }
+        }
+
+        function StockTradingApp() {
+            const [formData, setFormData] = useState({
+                totalCapital: 50000,
+                buyAmountPerPoint: 500,
+                sellThreshold: 5,
+                sellRatio: 50
+            });
+
+            const [results, setResults] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [selectedFile, setSelectedFile] = useState(null);
+            const [fileData, setFileData] = useState(null);
+            const [colorMode, setColorMode] = useState('reversed'); // 'standard' 或 'reversed'
+
+            const handleInputChange = (e) => {
+                const { name, value } = e.target;
+                setFormData(prev => ({
+                    ...prev,
+                    [name]: Number(value)
+                }));
+            };
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type === 'application/json') {
+                    setSelectedFile(file);
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            setFileData(data);
+                        } catch (error) {
+                            console.error('JSON文件解析失败:', error);
+                            alert('JSON文件格式错误，请检查文件内容');
+                        }
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert('请选择JSON格式的文件');
+                }
+            };
+
+            const getDefaultData = () => {
+                return [
+                    -2.5, -1.8, -3.2, 1.5, -1.2, -2.1, -1.5, 2.3, -1.8, -2.8,
+                    -1.1, 3.2, -2.5, -1.9, 4.1, -1.3, -2.7, 1.8, -1.6, 5.5,
+                    -1.4, -2.2, 2.1, -1.7, -3.1, 1.9, -2.3, -1.8, 4.8, 6.2
+                ];
+            };
+
+            // 获取盈亏颜色类名
+            const getProfitColor = (value) => {
+                if (value === 0) return 'text-gray-600';
+
+                if (colorMode === 'standard') {
+                    return value > 0 ? 'text-green-600' : 'text-red-600';
+                } else {
+                    return value > 0 ? 'text-red-600' : 'text-green-600';
+                }
+            };
+
+            // 获取涨跌颜色类名
+            const getChangeColor = (value) => {
+                if (value === 0) return 'text-gray-600';
+
+                if (colorMode === 'standard') {
+                    return value > 0 ? 'text-green-600' : 'text-red-600';
+                } else {
+                    return value > 0 ? 'text-red-600' : 'text-green-600';
+                }
+            };
+
+            const runSimulation = () => {
+                setLoading(true);
+                try {
+                    // 使用文件数据或默认数据
+                    const dailyChanges = fileData || getDefaultData();
+
+                    if (!dailyChanges || dailyChanges.length === 0) {
+                        alert('请先选择有效的JSON数据文件');
+                        setLoading(false);
+                        return;
+                    }
+
+                    const simulator = new StockTradingSimulator(
+                        formData.totalCapital,
+                        formData.buyAmountPerPoint,
+                        formData.sellThreshold,
+                        formData.sellRatio
+                    );
+
+                    const result = simulator.simulate(dailyChanges);
+                    setResults(result);
+                } catch (error) {
+                    console.error('模拟运行失败:', error);
+                    alert('模拟运行失败，请检查参数设置');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="container mx-auto p-6 max-w-7xl">
+                    <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">模拟器</h1>
+                    
+                    {/* 页面设置 */}
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h2 className="text-xl font-semibold mb-4 text-gray-700">页面设置</h2>
+                        <div className="flex items-center space-x-4">
+                            <label className="block text-sm font-medium text-gray-700">
+                                颜色模式:
+                            </label>
+                            <div className="flex space-x-4">
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="colorMode"
+                                        value="standard"
+                                        checked={colorMode === 'standard'}
+                                        onChange={(e) => setColorMode(e.target.value)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">标准模式</span>
+                                </label>
+                                <label className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="colorMode"
+                                        value="reversed"
+                                        checked={colorMode === 'reversed'}
+                                        onChange={(e) => setColorMode(e.target.value)}
+                                        className="mr-2"
+                                    />
+                                    <span className="text-sm">翻转模式</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 参数表单 */}
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟参数设置</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    总金额 (元)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="totalCapital"
+                                    value={formData.totalCapital}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    跌幅买入金额 (元/点)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="buyAmountPerPoint"
+                                    value={formData.buyAmountPerPoint}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    卖出阈值 (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="sellThreshold"
+                                    value={formData.sellThreshold}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    卖出比例 (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="sellRatio"
+                                    value={formData.sellRatio}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    测试数据文件 (JSON格式)
+                                </label>
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    onChange={handleFileChange}
+                                    className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                />
+                            </div>
+                            
+                            <div className="flex items-end">
+                                <button
+                                    onClick={runSimulation}
+                                    disabled={loading}
+                                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                >
+                                    {loading ? '运行中...' : '开始模拟'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 结果展示 */}
+                    {results && (
+                        <div className="space-y-6">
+                            {/* 总结信息 */}
+                            <div className="bg-white rounded-lg shadow-md p-6">
+                                <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟结果总结</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="text-center">
+                                        <div className={`text-2xl font-bold ${getChangeColor(results.totalPriceChange)}`}>
+                                            {results.totalPriceChange.toFixed(2)}%
+                                        </div>
+                                        <div className="text-sm text-gray-600">股价总涨跌幅</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className={`text-2xl font-bold ${getProfitColor(results.totalReturn)}`}>
+                                            {results.totalReturn.toFixed(0)}元
+                                        </div>
+                                        <div className="text-sm text-gray-600">总盈亏金额</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className={`text-2xl font-bold ${getProfitColor(results.returnPercent)}`}>
+                                            {results.returnPercent.toFixed(2)}%
+                                        </div>
+                                        <div className="text-sm text-gray-600">收益率</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-2xl font-bold text-purple-600">
+                                            {results.buyCount}/{results.sellCount}
+                                        </div>
+                                        <div className="text-sm text-gray-600">买入/卖出次数</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 每日详情表格 */}
+                            <div className="bg-white rounded-lg shadow-md p-6">
+                                <h2 className="text-xl font-semibold mb-4 text-gray-700">每日交易详情</h2>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full table-auto">
+                                        <thead>
+                                            <tr className="bg-gray-50">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易日</th>
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当前涨幅</th>
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓金额</th>
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总资产</th>
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易信息</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {results.dailyResults.map((day, index) => (
+                                                <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                                        第{day.day}天
+                                                    </td>
+                                                    <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
+                                                        {day.changePercent.toFixed(2)}%
+                                                    </td>
+                                                    <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
+                                                        {day.currentGainPercent.toFixed(2)}%
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                                        {day.holdingValue.toFixed(0)}元
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                                        {day.totalAssets.toFixed(0)}元
+                                                    </td>
+                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-600">
+                                                        {day.tradeInfo || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<StockTradingApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
