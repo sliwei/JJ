@@ -11,14 +11,18 @@ WORKDIR /app
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 创建日志目录
+RUN mkdir -p /app/logs
+
 # 复制项目文件
 COPY fund_api.py .
 COPY start_api.py .
 COPY test_api.py .
 COPY index.html .
+COPY gunicorn.conf.py .
 
 # 暴露端口
 EXPOSE 8080
 
-# 启动命令
-CMD ["python", "fund_api.py"]
+# 使用gunicorn启动应用 (生产环境)
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "fund_api:app"]

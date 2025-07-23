@@ -225,4 +225,5 @@ def jj_page():
 if __name__ == '__main__':
     print("启动基金数据API服务...")
     print("请确保已安装依赖: pip install akshare flask flask-cors pandas")
-    app.run(host='0.0.0.0', port=8080, debug=True) 
+    # 生产环境建议使用: gunicorn -w 4 -b 0.0.0.0:8080 fund_api:app
+    app.run(host='0.0.0.0', port=8080, debug=False) 

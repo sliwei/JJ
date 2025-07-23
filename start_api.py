@@ -8,6 +8,7 @@ JJ Simulator API启动脚本
 import subprocess
 import sys
 import os
+import argparse
 
 def check_and_install_dependencies():
     """检查并安装依赖"""
@@ -15,7 +16,8 @@ def check_and_install_dependencies():
         'akshare',
         'flask',
         'flask-cors', 
-        'pandas'
+        'pandas',
+        'gunicorn'
     ]
     
     missing_packages = []
@@ -31,8 +33,12 @@ def check_and_install_dependencies():
     if missing_packages:
         print(f"\n正在安装缺失的依赖: {', '.join(missing_packages)}")
         try:
+            # 添加trusted-host参数解决SSL证书问题
             subprocess.check_call([
-                sys.executable, '-m', 'pip', 'install'
+                sys.executable, '-m', 'pip', 'install',
+                '--trusted-host', 'pypi.org',
+                '--trusted-host', 'pypi.python.org', 
+                '--trusted-host', 'files.pythonhosted.org'
             ] + missing_packages)
             print("✓ 依赖安装完成")
         except subprocess.CalledProcessError as e:
@@ -42,10 +48,13 @@ def check_and_install_dependencies():
     
     return True
 
-def start_api_server():
+def start_api_server(production=False):
     """启动API服务"""
     print("\n" + "="*50)
-    print("🚀 启动 JJ Simulator API 服务")
+    if production:
+        print("🚀 启动 JJ Simulator API 服务 (生产模式)")
+    else:
+        print("🚀 启动 JJ Simulator API 服务 (开发模式)")
     print("="*50)
     
     if not os.path.exists('fund_api.py'):
@@ -53,15 +62,23 @@ def start_api_server():
         return False
     
     try:
-        # 导入并启动API服务
-        from fund_api import app
         print("✓ API服务启动成功")
         print("📍 服务地址: http://localhost:8080")
         print("📋 健康检查: http://localhost:8080/health")
         print("📖 使用说明: 请在浏览器中打开 index.html")
         print("\n按 Ctrl+C 停止服务\n")
         
-        app.run(host='0.0.0.0', port=8080, debug=False)
+        if production:
+            # 生产模式使用gunicorn
+            if os.path.exists('gunicorn.conf.py'):
+                cmd = ['gunicorn', '--config', 'gunicorn.conf.py', 'fund_api:app']
+            else:
+                cmd = ['gunicorn', '--bind', '0.0.0.0:8080', '--workers', '4', 'fund_api:app']
+            subprocess.run(cmd)
+        else:
+            # 开发模式使用Flask内置服务器
+            from fund_api import app
+            app.run(host='0.0.0.0', port=8080, debug=True)
         
     except KeyboardInterrupt:
         print("\n👋 API服务已停止")
@@ -72,6 +89,11 @@ def start_api_server():
 
 def main():
     """主函数"""
+    parser = argparse.ArgumentParser(description='JJ Simulator API 启动脚本')
+    parser.add_argument('--production', '-p', action='store_true', 
+                       help='使用生产模式启动 (gunicorn)')
+    args = parser.parse_args()
+    
     print("JJ Simulator - 基金交易模拟器")
     print("基于AKShare的基金数据API服务\n")
     
@@ -80,7 +102,7 @@ def main():
         sys.exit(1)
     
     # 启动服务
-    if not start_api_server():
+    if not start_api_server(production=args.production):
         sys.exit(1)
 
 if __name__ == '__main__':
