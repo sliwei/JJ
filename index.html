@@ -161,19 +161,13 @@
                 this.currentPrice = 1;
                 this.totalInvested = 0;
                 this.tradingLog = [];
-                this.stage = 1;
-                this.stageResults = [];
-                this.dayCounter = 0;
                 this.dailyTradeInfo = '';
                 this.dailyResults = [];
             }
 
-            processDailyChange(changePercent) {
-                this.dayCounter++;
+            processDailyChange(changePercent, date, netValue) {
                 this.dailyTradeInfo = '';
-
-                const previousPrice = this.currentPrice;
-                this.currentPrice = previousPrice * (1 + changePercent / 100);
+                this.currentPrice = netValue;
 
                 if (changePercent < 0 && this.remainingCapital > 0) {
                     this.buyStock(Math.abs(changePercent));
@@ -183,7 +177,7 @@
                     this.checkSellCondition();
                 }
 
-                this.logDailyStatus(changePercent);
+                this.logDailyStatus(changePercent, date);
             }
 
             buyStock(dropPercent) {
@@ -261,7 +255,6 @@
 
                 this.tradingLog.push({
                     type: 'SELL_PARTIAL',
-                    stage: this.stage,
                     price: this.currentPrice,
                     shares: sellShares,
                     amount: sellAmount,
@@ -272,7 +265,7 @@
                 });
             }
 
-            logDailyStatus(changePercent) {
+            logDailyStatus(changePercent, date) {
                 const totalShares = this.positions.reduce((sum, pos) => sum + pos.shares, 0);
                 const currentValue = totalShares * this.currentPrice;
                 const totalAssets = this.remainingCapital + currentValue;
@@ -300,7 +293,7 @@
 
                 // 计算昨日持仓额
                 let yesterdayHoldingValue = 0;
-                if (this.dayCounter > 1) {
+                if (this.dailyResults.length > 0) {
                     const yesterdayResult = this.dailyResults[this.dailyResults.length - 1];
                     if (yesterdayResult) {
                         yesterdayHoldingValue = yesterdayResult.holdingValue;
@@ -324,7 +317,7 @@
                     let detailParts = [];
 
                     // 昨日持仓（灰色）- 第一天显示为0
-                    const baseValue = this.dayCounter === 1 ? 0 : yesterdayHoldingValue;
+                    const baseValue = this.dailyResults.length === 0 ? 0 : yesterdayHoldingValue;
                     detailParts.push(`<span class="text-gray-500">本${baseValue.toFixed(0)}</span>`);
 
                     // 当日盈亏（根据设置颜色显示）
@@ -354,7 +347,7 @@
                 const cumulativeChange = ((this.currentPrice - 1) / 1) * 100;
 
                 this.dailyResults.push({
-                    day: this.dayCounter,
+                    date: date,
                     changePercent: changePercent,
                     cumulativeChange: cumulativeChange,
                     currentGainPercent: currentGainPercent,
@@ -367,10 +360,10 @@
                 });
             }
 
-            simulate(dailyChanges) {
+            simulate(fundDataArray) {
                 this.dailyResults = [];
-                dailyChanges.forEach((change) => {
-                    this.processDailyChange(change);
+                fundDataArray.forEach((fundData) => {
+                    this.processDailyChange(fundData.daily_growth, fundData.date, fundData.net_value);
                 });
                 return this.getFinalResult();
             }
@@ -410,8 +403,7 @@
 
             const [results, setResults] = useState(null);
             const [loading, setLoading] = useState(false);
-            const [selectedFile, setSelectedFile] = useState(null);
-            const [fileData, setFileData] = useState(null);
+            const [fundData, setFundData] = useState(null);
             const [colorMode, setColorMode] = useState('reversed'); // 'standard' 或 'reversed'
             const [showSettings, setShowSettings] = useState(false); // 控制设置弹窗显示
             const [viewMode, setViewMode] = useState('table'); // 'table' 或 'chart'
@@ -448,12 +440,55 @@
             // 防抖的自动计算函数 - 接受最新的formData参数
             const debouncedAutoCalculate = useDebounce(async (latestFormData) => {
                 try {
-                    await runSimulationWithData(null, latestFormData);
+                    // 使用当前的fundData
+                    await runSimulationWithData(latestFormData, fundData);
                 } finally {
                     // 计算完成后重置状态
                     setIsAutoCalculating(false);
                 }
             }, 300); // 300ms防抖延迟
+
+            // 获取基金数据的函数
+            const fetchFundData = async () => {
+                if (!formData.fundCode) {
+                    alert('请输入基金编号');
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    // 构造API请求URL
+                    const apiUrl = `http://localhost:8080/api/fund_data?code=${formData.fundCode}&start_date=${formData.startDate || ''}&end_date=${formData.endDate || ''}`;
+                    
+                    console.log('正在请求API:', apiUrl);
+                    
+                    const response = await fetch(apiUrl);
+                    const result = await response.json();
+                    
+                    if (!result.success) {
+                        throw new Error(result.error || '获取数据失败');
+                    }
+                    
+                    const fundDataFromAPI = result.data;
+                    
+                    if (!fundDataFromAPI || fundDataFromAPI.length === 0) {
+                        throw new Error('没有获取到有效数据');
+                    }
+                    
+                    setFundData(fundDataFromAPI);
+                    
+                    console.log(`获取到 ${fundDataFromAPI.length} 条基金数据，第一条日期: ${fundDataFromAPI[0]?.date}`);
+                    
+                    // 自动运行模拟
+                    await runSimulationWithData(formData, fundDataFromAPI);
+                    
+                } catch (error) {
+                    console.error('获取基金数据失败:', error);
+                    alert(`错误信息: ${error.message}`);
+                } finally {
+                    setLoading(false);
+                }
+            };
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
@@ -469,39 +504,13 @@
                 debouncedAutoCalculate(newFormData);
             };
 
-            const handleFileChange = (e) => {
-                const file = e.target.files[0];
-                if (file && file.type === 'application/json') {
-                    setSelectedFile(file);
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        try {
-                            const data = JSON.parse(event.target.result);
-                            setFileData(data);
-                            // 文件加载成功后自动运行模拟
-                            setTimeout(async () => {
-                                try {
-                                    await runSimulationWithData(data);
-                                } catch (error) {
-                                    console.error('自动运行模拟失败:', error);
-                                }
-                            }, 100);
-                        } catch (error) {
-                            console.error('JSON文件解析失败:', error);
-                            alert('JSON文件格式错误，请检查文件内容');
-                        }
-                    };
-                    reader.readAsText(file);
-                } else {
-                    alert('请选择JSON格式的文件');
-                }
-            };
-
-            const getDefaultData = () => {
-                return [
-                    -2.5, -1.8, -3.2, 1.5, -1.2, -2.1, -1.5, 2.3, -1.8, -2.8,
-                    -1.1, 3.2, -2.5, -1.9, 4.1, -1.3, -2.7, 1.8, -1.6, 5.5
-                ];
+            // 处理基金编号和日期字段的变化，不触发自动计算
+            const handleBasicInfoChange = (e) => {
+                const { name, value } = e.target;
+                setFormData({
+                    ...formData,
+                    [name]: value
+                });
             };
 
             // 获取盈亏颜色类名
@@ -526,14 +535,15 @@
                 }
             };
 
-            const runSimulationWithData = (data, customFormData) => {
+            const runSimulationWithData = (customFormData, customFundData) => {
                 return new Promise((resolve, reject) => {
                     setLoading(true);
                     try {
-                        const dailyChanges = data || fileData || getDefaultData();
-
-                        if (!dailyChanges || dailyChanges.length === 0) {
-                            alert('请先选择有效的JSON数据文件');
+                        // 使用传入的fundData或当前的fundData
+                        const currentFundData = customFundData || fundData;
+                        
+                        if (!currentFundData || currentFundData.length === 0) {
+                            alert('请先获取基金数据');
                             setLoading(false);
                             reject(new Error('无效数据'));
                             return;
@@ -551,7 +561,7 @@
                             currentFormData.sellRatio
                         );
 
-                        const result = simulator.simulate(dailyChanges);
+                        const result = simulator.simulate(currentFundData);
                         setResults(result);
                         resolve(result);
                     } catch (error) {
@@ -565,7 +575,11 @@
             };
 
             const runSimulation = () => {
-                runSimulationWithData(null);
+                if (!fundData || fundData.length === 0) {
+                    alert('请先获取基金数据');
+                    return;
+                }
+                runSimulationWithData(formData, fundData);
             };
 
             // 设置CSS变量
@@ -579,13 +593,6 @@
                     root.style.setProperty('--loss-color', '#16a34a'); // green-600
                 }
             }, [colorMode]);
-
-            // 页面加载时自动运行一次默认数据的模拟
-            React.useEffect(() => {
-                runSimulationWithData(getDefaultData()).catch(error => {
-                    console.error('初始化模拟失败:', error);
-                });
-            }, []);
 
             // 图表组件
             const TrendChart = ({ data }) => {
@@ -602,7 +609,18 @@
                         chartInstance.current.destroy();
                     }
 
-                    const labels = data.dailyResults.map((_, index) => `${index + 1}`);
+                    const labels = data.dailyResults.map(day => {
+                        // 格式化日期显示为"几月几号"
+                        if (day.date && day.date.includes('-')) {
+                            const parts = day.date.split('-');
+                            if (parts.length === 3) {
+                                const month = parseInt(parts[1]);
+                                const dayNum = parseInt(parts[2]);
+                                return `${month}月${dayNum}日`;
+                            }
+                        }
+                        return day.date;
+                    });
                     
                     // 处理买入卖出标记点
                     const cumulativeChangeData = data.dailyResults.map(day => day.cumulativeChange);
@@ -701,7 +719,7 @@
                                     display: true,
                                     title: {
                                         display: true,
-                                        text: '交易日'
+                                        text: '日期'
                                     }
                                 },
                                 y: {
@@ -763,78 +781,221 @@
                             <div className="lg:w-1/3 left-panel">
                                 <div className="bg-white rounded-lg shadow-md p-6 h-full">
                                     <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟参数</h2>
-                                    <div className="space-y-4">
+                                    <div className="space-y-3">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                总额 <span className="text-xs text-gray-500">（初始总资产）</span>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                基金编号 <span className="text-xs text-gray-500">（6位代码）</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="fundCode"
+                                                value={formData.fundCode || ''}
+                                                onChange={handleBasicInfoChange}
+                                                placeholder="000001"
+                                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    开始日期
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="startDate"
+                                                value={formData.startDate || ''}
+                                                    onChange={handleBasicInfoChange}
+                                                    placeholder="20230101"
+                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                    结束日期
+                                            </label>
+                                            <input
+                                                type="text"
+                                                name="endDate"
+                                                value={formData.endDate || ''}
+                                                    onChange={handleBasicInfoChange}
+                                                    placeholder="20231231"
+                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const today = new Date();
+                                                        const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+                                                        const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        const startDate = oneMonthAgo.toISOString().slice(0, 10).replace(/-/g, '');
+                                                    setFormData({
+                                                        ...formData,
+                                                            startDate,
+                                                            endDate
+                                                    });
+                                                }}
+                                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                >
+                                                    1个月
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const today = new Date();
+                                                        const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate());
+                                                        const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        const startDate = threeMonthsAgo.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        setFormData({
+                                                            ...formData,
+                                                            startDate,
+                                                            endDate
+                                                        });
+                                                    }}
+                                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                >
+                                                    3个月
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const today = new Date();
+                                                        const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+                                                        const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        const startDate = oneYearAgo.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        setFormData({
+                                                            ...formData,
+                                                            startDate,
+                                                            endDate
+                                                        });
+                                                    }}
+                                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                >
+                                                    1年
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const today = new Date();
+                                                        const fiveYearsAgo = new Date(today.getFullYear() - 5, today.getMonth(), today.getDate());
+                                                        const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        const startDate = fiveYearsAgo.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        setFormData({
+                                                            ...formData,
+                                                            startDate,
+                                                            endDate
+                                                        });
+                                                    }}
+                                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                                >
+                                                    5年
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const today = new Date();
+                                                        const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
+                                                        setFormData({
+                                                            ...formData,
+                                                            startDate: '',
+                                                            endDate
+                                                        });
+                                                    }}
+                                                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors col-span-2"
+                                                >
+                                                    成立以来
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <button
+                                                onClick={fetchFundData}
+                                                disabled={loading || !formData.fundCode}
+                                                className="w-full bg-green-600 text-white py-1.5 px-3 text-sm rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                                            >
+                                                {loading ? '获取数据中...' : '获取基金数据'}
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="买入时，当前跌幅达到最小买入跌幅时买入">
+                                                    总额
                                             </label>
                                             <input
                                                 type="number"
                                                 name="totalCapital"
                                                 value={formData.totalCapital}
                                                 onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         </div>
-
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                最小买入跌幅 (%) <span className="text-xs text-gray-500">（买入时，跌幅大于等于最小买入跌幅时，买入份额）</span>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="买入时，当前跌幅达到最小买入跌幅时买入">
+                                                    每份额买入额
                                             </label>
                                             <input
                                                 type="number"
-                                                step="0.1"
-                                                name="minBuyDropPercent"
-                                                value={formData.minBuyDropPercent}
+                                                    name="buyAmountPerPoint"
+                                                    value={formData.buyAmountPerPoint}
                                                 onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
+                                            </div>
                                         </div>
 
+                                        <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                每份额买入额 <span className="text-xs text-gray-500">（买入时，每份额买入额）</span>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="买入时，当前跌幅达到最小买入跌幅时买入">
+                                                    最小买入跌幅 (%)
                                             </label>
                                             <input
                                                 type="number"
-                                                name="buyAmountPerPoint"
-                                                value={formData.buyAmountPerPoint}
+                                                    step="0.1"
+                                                    name="minBuyDropPercent"
+                                                    value={formData.minBuyDropPercent}
                                                 onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         </div>
-
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                卖出阈值 (%) <span className="text-xs text-gray-500">（卖出时，当前持仓额达到总资产的百分比）</span>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="卖出时，当前持仓额达到总资产的百分比">
+                                                    卖出阈值 (%)
                                             </label>
                                             <input
                                                 type="number"
                                                 name="sellThreshold"
                                                 value={formData.sellThreshold}
                                                 onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
+                                            </div>
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                卖出比例 (%) <span className="text-xs text-gray-500">（卖出时，当前持仓额达到总资产的百分比）</span>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1" title="卖出时，当前持仓额达到总资产的百分比">
+                                                卖出比例 (%)
                                             </label>
                                             <input
                                                 type="number"
                                                 name="sellRatio"
                                                 value={formData.sellRatio}
                                                 onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
                                                 份额计算方式
                                             </label>
-                                            <div className="">
+                                            <div className="space-y-1">
                                                         <label className="flex items-center">
                                                             <input
                                                                 type="radio"
@@ -849,8 +1010,9 @@
                                                                 }}
                                                                 className="mr-2"
                                                             />
-                                                            <span className="text-sm mr-2">四舍五入</span> 
+                                                            <span className="text-xs mr-2">四舍五入</span>
                                                             <span className="text-xs text-gray-500">跌幅按最小跌幅四舍五入计算份额</span>
+
                                                         </label>
                                                         <label className="flex items-center">
                                                             <input
@@ -866,29 +1028,20 @@
                                                                 }}
                                                                 className="mr-2"
                                                             />
-                                                            <span className="text-sm mr-2">向下取整</span> 
+                                                            <span className="text-xs mr-2">向下取整</span>
                                                             <span className="text-xs text-gray-500">跌幅按大于等于最小跌幅计算份额</span>
+
                                                         </label>
                                             </div>
                                         </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                数据文件 (JSON格式)
-                                            </label>
-                                            <input
-                                                type="file"
-                                                accept=".json"
-                                                onChange={handleFileChange}
-                                                className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                            />
-                                        </div>
+                                      
 
                                         <div>
                                             <button
                                                 onClick={runSimulation}
                                                 disabled={loading || isAutoCalculating}
-                                                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
+                                                className="w-full bg-blue-600 text-white py-1.5 px-3 text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
                                             >
                                                 {loading ? '运行中...' : isAutoCalculating ? (
                                                     <>
@@ -928,7 +1081,7 @@
                                                     <div className="text-2xl font-bold text-blue-600">
                                                         {results.dailyResults.length}天
                                                     </div>
-                                                    <div className="text-sm text-gray-600">总天数</div>
+                                                    <div className="text-sm text-gray-600">交易日数</div>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getChangeColor(results.totalPriceChange)}`}>
@@ -977,7 +1130,7 @@
                                                     <table className="min-w-full table-auto compact-table">
                                                         <thead>
                                                             <tr className="bg-gray-50">
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易日</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
                                                                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
                                                                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">累计涨跌</th>
                                                                 <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓涨幅</th>
@@ -990,7 +1143,7 @@
                                                             {results.dailyResults.map((day, index) => (
                                                                 <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                                                     <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                        {day.day}
+                                                                        {day.date}
                                                                     </td>
                                                                     <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
                                                                         {day.changePercent > 0 ? '+' : ''}{day.changePercent.toFixed(2)}%
@@ -1039,7 +1192,8 @@
                                 ) : (
                                     <div className="bg-white rounded-lg shadow-md p-6 h-full flex items-center justify-center">
                                         <div className="text-center text-gray-500">
-                                            <p className="text-lg mb-2">请设置参数并点击"开始模拟"查看结果</p>
+                                            <p className="text-lg mb-2">请先获取基金数据</p>
+                                            <p className="text-sm">输入基金编号并点击"获取基金数据"开始</p>
                                         </div>
                                     </div>
                                 )}
@@ -1098,6 +1252,25 @@
                                 </div>
                             </div>
                         )}
+                        
+                        {/* 使用提示 */}
+                        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-start">
+                                <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                    <h4 className="text-sm font-medium text-blue-800 mb-2">使用说明</h4>
+                                    <ul className="text-xs text-blue-700 space-y-1">
+                                        <li>• 输入6位基金代码（如：000001华夏成长）</li>
+                                        <li>• 日期格式为YYYYMMDD（如：20230101）</li>
+                                        <li>• 需要启动后端API服务获取真实数据</li>
+                                        <li>• 启动命令：<code className="bg-blue-100 px-1 rounded">python start_api.py</code></li>
+                                        <li>• API地址：<code className="bg-blue-100 px-1 rounded">http://localhost:8080</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
