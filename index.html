@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JJ模拟器</title>
+    <title>JJ Simulator</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* 固定表头样式 */
         .sticky-table {
@@ -98,6 +99,11 @@
             max-height: none;
         }
 
+        .chart-container {
+            flex: 1;
+            min-height: 400px;
+        }
+
         /* 设置弹窗样式 */
         .settings-modal {
             position: fixed;
@@ -137,9 +143,9 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
-        // JJ模拟器类
+        // JJ Simulator类
         class StockTradingSimulator {
             constructor(totalCapital, buyAmountPerPoint, minBuyDropPercent, useRounding, sellThreshold, sellRatio) {
                 this.originalCapital = totalCapital;
@@ -192,7 +198,7 @@
                     buyShares = Math.floor(dropPercent / this.minBuyDropPercent);
                 }
 
-                // 计算实际买入金额
+                // 计算实际买入额
                 const buyAmount = buyShares * this.buyAmountPerPoint;
                 const actualBuyAmount = Math.min(buyAmount, this.remainingCapital);
 
@@ -207,7 +213,7 @@
 
                     this.remainingCapital -= actualBuyAmount;
                     this.totalInvested += actualBuyAmount;
-                    this.dailyTradeInfo = `买入${buyShares}份额(${actualBuyAmount.toFixed(0)}元)`;
+                    this.dailyTradeInfo = `买入${buyShares}份额(${actualBuyAmount.toFixed(0)})`;
 
                     this.tradingLog.push({
                         type: 'BUY',
@@ -240,8 +246,8 @@
                 const soldInvestment = (sellShares / totalShares) * this.totalInvested;
                 const profit = sellAmount - soldInvestment;
 
-                const profitText = profit >= 0 ? `盈利${profit.toFixed(0)}元` : `亏损${Math.abs(profit).toFixed(0)}元`;
-                this.dailyTradeInfo = `卖出${this.sellRatio}%(${sellAmount.toFixed(0)}元,${profitText})`;
+                const profitText = profit >= 0 ? `盈利${profit.toFixed(0)}` : `亏损${Math.abs(profit).toFixed(0)}`;
+                this.dailyTradeInfo = `卖出${this.sellRatio}%(${sellAmount.toFixed(0)},${profitText})`;
 
                 // 按比例减少持仓
                 this.positions = this.positions.map(pos => ({
@@ -276,23 +282,23 @@
                 let todayBuyAmount = 0;
                 let todaySellAmount = 0;
 
-                // 获取今日买入金额
+                // 获取今日买入额
                 if (this.dailyTradeInfo.includes('买入')) {
-                    const match = this.dailyTradeInfo.match(/买入.*?\((\d+)元\)/);
+                    const match = this.dailyTradeInfo.match(/买入.*?\((\d+)\)/);
                     if (match) {
                         todayBuyAmount = parseFloat(match[1]);
                     }
                 }
 
-                // 获取今日卖出金额（实际卖出的金额，不是盈亏）
+                // 获取今日卖出额（实际卖出的额，不是盈亏）
                 if (this.dailyTradeInfo.includes('卖出')) {
-                    const match = this.dailyTradeInfo.match(/卖出.*?\((\d+)元/);
+                    const match = this.dailyTradeInfo.match(/卖出.*?\((\d+)/);
                     if (match) {
                         todaySellAmount = parseFloat(match[1]);
                     }
                 }
 
-                // 计算昨日持仓金额
+                // 计算昨日持仓额
                 let yesterdayHoldingValue = 0;
                 if (this.dayCounter > 1) {
                     const yesterdayResult = this.dailyResults[this.dailyResults.length - 1];
@@ -394,8 +400,8 @@
 
         function StockTradingApp() {
             const [formData, setFormData] = useState({
-                totalCapital: 50000,
-                buyAmountPerPoint: 500,
+                totalCapital: 10000,
+                buyAmountPerPoint: 100,
                 minBuyDropPercent: 1.0,
                 useRounding: true,
                 sellThreshold: 5,
@@ -408,13 +414,59 @@
             const [fileData, setFileData] = useState(null);
             const [colorMode, setColorMode] = useState('reversed'); // 'standard' 或 'reversed'
             const [showSettings, setShowSettings] = useState(false); // 控制设置弹窗显示
+            const [viewMode, setViewMode] = useState('table'); // 'table' 或 'chart'
+            const [isAutoCalculating, setIsAutoCalculating] = useState(false); // 自动计算状态
+
+            // 防抖函数
+            const useDebounce = (callback, delay) => {
+                const debounceRef = useRef(null);
+                const lastExecutionRef = useRef(0);
+                
+                return useCallback((...args) => {
+                    const now = Date.now();
+                    
+                    // 清除之前的定时器
+                    if (debounceRef.current) {
+                        clearTimeout(debounceRef.current);
+                    }
+                    
+                    // 如果距离上次执行不足300ms，延迟执行
+                    if (now - lastExecutionRef.current < delay) {
+                        debounceRef.current = setTimeout(() => {
+                            lastExecutionRef.current = Date.now();
+                            callback(...args);
+                            debounceRef.current = null;
+                        }, delay - (now - lastExecutionRef.current));
+                    } else {
+                        // 立即执行
+                        lastExecutionRef.current = now;
+                        callback(...args);
+                    }
+                }, [callback, delay]);
+            };
+
+            // 防抖的自动计算函数 - 接受最新的formData参数
+            const debouncedAutoCalculate = useDebounce(async (latestFormData) => {
+                try {
+                    await runSimulationWithData(null, latestFormData);
+                } finally {
+                    // 计算完成后重置状态
+                    setIsAutoCalculating(false);
+                }
+            }, 300); // 300ms防抖延迟
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
-                setFormData(prev => ({
-                    ...prev,
+                const newFormData = {
+                    ...formData,
                     [name]: Number(value)
-                }));
+                };
+                setFormData(newFormData);
+                
+                // 显示即将计算的状态
+                setIsAutoCalculating(true);
+                // 自动触发计算（防抖），传递最新的formData
+                debouncedAutoCalculate(newFormData);
             };
 
             const handleFileChange = (e) => {
@@ -427,8 +479,12 @@
                             const data = JSON.parse(event.target.result);
                             setFileData(data);
                             // 文件加载成功后自动运行模拟
-                            setTimeout(() => {
-                                runSimulationWithData(data);
+                            setTimeout(async () => {
+                                try {
+                                    await runSimulationWithData(data);
+                                } catch (error) {
+                                    console.error('自动运行模拟失败:', error);
+                                }
                             }, 100);
                         } catch (error) {
                             console.error('JSON文件解析失败:', error);
@@ -470,34 +526,42 @@
                 }
             };
 
-            const runSimulationWithData = (data) => {
-                setLoading(true);
-                try {
-                    const dailyChanges = data || fileData || getDefaultData();
+            const runSimulationWithData = (data, customFormData) => {
+                return new Promise((resolve, reject) => {
+                    setLoading(true);
+                    try {
+                        const dailyChanges = data || fileData || getDefaultData();
 
-                    if (!dailyChanges || dailyChanges.length === 0) {
-                        alert('请先选择有效的JSON数据文件');
+                        if (!dailyChanges || dailyChanges.length === 0) {
+                            alert('请先选择有效的JSON数据文件');
+                            setLoading(false);
+                            reject(new Error('无效数据'));
+                            return;
+                        }
+
+                        // 使用传入的formData或当前的formData
+                        const currentFormData = customFormData || formData;
+
+                        const simulator = new StockTradingSimulator(
+                            currentFormData.totalCapital,
+                            currentFormData.buyAmountPerPoint,
+                            currentFormData.minBuyDropPercent,
+                            currentFormData.useRounding,
+                            currentFormData.sellThreshold,
+                            currentFormData.sellRatio
+                        );
+
+                        const result = simulator.simulate(dailyChanges);
+                        setResults(result);
+                        resolve(result);
+                    } catch (error) {
+                        console.error('模拟运行失败:', error);
+                        alert('模拟运行失败，请检查参数设置');
+                        reject(error);
+                    } finally {
                         setLoading(false);
-                        return;
                     }
-
-                    const simulator = new StockTradingSimulator(
-                        formData.totalCapital,
-                        formData.buyAmountPerPoint,
-                        formData.minBuyDropPercent,
-                        formData.useRounding,
-                        formData.sellThreshold,
-                        formData.sellRatio
-                    );
-
-                    const result = simulator.simulate(dailyChanges);
-                    setResults(result);
-                } catch (error) {
-                    console.error('模拟运行失败:', error);
-                    alert('模拟运行失败，请检查参数设置');
-                } finally {
-                    setLoading(false);
-                }
+                });
             };
 
             const runSimulation = () => {
@@ -518,15 +582,170 @@
 
             // 页面加载时自动运行一次默认数据的模拟
             React.useEffect(() => {
-                runSimulationWithData(getDefaultData());
+                runSimulationWithData(getDefaultData()).catch(error => {
+                    console.error('初始化模拟失败:', error);
+                });
             }, []);
+
+            // 图表组件
+            const TrendChart = ({ data }) => {
+                const chartRef = useRef(null);
+                const chartInstance = useRef(null);
+
+                useEffect(() => {
+                    if (!data || !data.dailyResults || data.dailyResults.length === 0) return;
+
+                    const ctx = chartRef.current.getContext('2d');
+                    
+                    // 销毁之前的图表实例
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                    }
+
+                    const labels = data.dailyResults.map((_, index) => `${index + 1}`);
+                    
+                    // 处理买入卖出标记点
+                    const cumulativeChangeData = data.dailyResults.map(day => day.cumulativeChange);
+                    const pointStyles = data.dailyResults.map(day => {
+                        if (day.tradeInfo) {
+                            if (day.tradeInfo.includes('买入')) {
+                                return {
+                                    backgroundColor: 'rgb(34, 197, 94)', // 绿色
+                                    borderColor: 'rgb(34, 197, 94)',
+                                    radius: 8,
+                                    hoverRadius: 10
+                                };
+                            } else if (day.tradeInfo.includes('卖出')) {
+                                return {
+                                    backgroundColor: 'rgb(239, 68, 68)', // 红色
+                                    borderColor: 'rgb(239, 68, 68)',
+                                    radius: 8,
+                                    hoverRadius: 10
+                                };
+                            }
+                        }
+                        return {
+                            backgroundColor: 'rgb(59, 130, 246)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            radius: 3,
+                            hoverRadius: 6
+                        };
+                    });
+                    
+                    chartInstance.current = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: '累计涨跌(%)',
+                                    data: cumulativeChangeData,
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    yAxisID: 'y',
+                                    pointRadius: pointStyles.map(style => style.radius),
+                                    pointHoverRadius: pointStyles.map(style => style.hoverRadius),
+                                    pointBackgroundColor: pointStyles.map(style => style.backgroundColor),
+                                    pointBorderColor: pointStyles.map(style => style.borderColor)
+                                },
+                                {
+                                    label: '持仓涨幅(%)',
+                                    data: data.dailyResults.map(day => day.currentGainPercent),
+                                    borderColor: 'rgb(16, 185, 129)',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    yAxisID: 'y'
+                                },
+                                {
+                                    label: '持仓额',
+                                    data: data.dailyResults.map(day => day.holdingValue),
+                                    borderColor: 'rgb(245, 101, 101)',
+                                    backgroundColor: 'rgba(245, 101, 101, 0.1)',
+                                    yAxisID: 'y1'
+                                },
+                                {
+                                    label: '总资产',
+                                    data: data.dailyResults.map(day => day.totalAssets),
+                                    borderColor: 'rgb(168, 85, 247)',
+                                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                                    yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        afterLabel: function(context) {
+                                            if (context.datasetIndex === 0) { // 只在累计涨跌线上显示交易信息
+                                                const dayData = data.dailyResults[context.dataIndex];
+                                                if (dayData.tradeInfo) {
+                                                    return `交易: ${dayData.tradeInfo}`;
+                                                }
+                                            }
+                                            return '';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    display: true,
+                                    title: {
+                                        display: true,
+                                        text: '交易日'
+                                    }
+                                },
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    title: {
+                                        display: true,
+                                        text: '百分比(%)'
+                                    },
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: '额'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false,
+                                    },
+                                }
+                            }
+                        }
+                    });
+
+                    return () => {
+                        if (chartInstance.current) {
+                            chartInstance.current.destroy();
+                        }
+                    };
+                }, [data]);
+
+                return <canvas ref={chartRef} style={{ width: '100%', height: '100%' }} />;
+            };
 
             return (
                 <div className="fixed-height-container">
                     <div className="container mx-auto p-6 max-w-full">
                         {/* 标题栏和设置按钮 */}
                         <div className="flex justify-between items-center mb-6">
-                            <h1 className="text-3xl font-bold text-gray-800">JJ模拟器</h1>
+                            
+                            <h1 className="text-3xl font-bold text-gray-800"><span className="inline-block origin-center rotate-180">J</span><span>J</span> Simulator</h1>
                             <button
                                 onClick={() => setShowSettings(true)}
                                 className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center space-x-2"
@@ -547,7 +766,7 @@
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                总金额 (元)
+                                                总额 <span className="text-xs text-gray-500">（初始总资产）</span>
                                             </label>
                                             <input
                                                 type="number"
@@ -560,7 +779,7 @@
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                最小买入跌幅 (%)
+                                                最小买入跌幅 (%) <span className="text-xs text-gray-500">（买入时，跌幅大于等于最小买入跌幅时，买入份额）</span>
                                             </label>
                                             <input
                                                 type="number"
@@ -574,7 +793,7 @@
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                每份额买入金额 (元)
+                                                每份额买入额 <span className="text-xs text-gray-500">（买入时，每份额买入额）</span>
                                             </label>
                                             <input
                                                 type="number"
@@ -587,7 +806,7 @@
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                卖出阈值 (%)
+                                                卖出阈值 (%) <span className="text-xs text-gray-500">（卖出时，当前持仓额达到总资产的百分比）</span>
                                             </label>
                                             <input
                                                 type="number"
@@ -600,7 +819,7 @@
 
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                卖出比例 (%)
+                                                卖出比例 (%) <span className="text-xs text-gray-500">（卖出时，当前持仓额达到总资产的百分比）</span>
                                             </label>
                                             <input
                                                 type="number"
@@ -615,34 +834,42 @@
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 份额计算方式
                                             </label>
-                                            <div className="flex space-x-4 mt-2">
-                                                <label className="flex items-center">
-                                                    <input
-                                                        type="radio"
-                                                        name="useRounding"
-                                                        value="true"
-                                                        checked={formData.useRounding === true}
-                                                        onChange={(e) => setFormData(prev => ({ ...prev, useRounding: e.target.value === 'true' }))}
-                                                        className="mr-2"
-                                                    />
-                                                    <span className="text-sm">四舍五入</span>
-                                                </label>
-                                                <label className="flex items-center">
-                                                    <input
-                                                        type="radio"
-                                                        name="useRounding"
-                                                        value="false"
-                                                        checked={formData.useRounding === false}
-                                                        onChange={(e) => setFormData(prev => ({ ...prev, useRounding: e.target.value === 'true' }))}
-                                                        className="mr-2"
-                                                    />
-                                                    <span className="text-sm">向下取整</span>
-                                                </label>
+                                            <div className="">
+                                                        <label className="flex items-center">
+                                                            <input
+                                                                type="radio"
+                                                                name="useRounding"
+                                                                value="true"
+                                                                checked={formData.useRounding === true}
+                                                                onChange={(e) => {
+                                                                    const newFormData = { ...formData, useRounding: e.target.value === 'true' };
+                                                                    setFormData(newFormData);
+                                                                    setIsAutoCalculating(true);
+                                                                    debouncedAutoCalculate(newFormData);
+                                                                }}
+                                                                className="mr-2"
+                                                            />
+                                                            <span className="text-sm mr-2">四舍五入</span> 
+                                                            <span className="text-xs text-gray-500">跌幅按最小跌幅四舍五入计算份额</span>
+                                                        </label>
+                                                        <label className="flex items-center">
+                                                            <input
+                                                                type="radio"
+                                                                name="useRounding"
+                                                                value="false"
+                                                                checked={formData.useRounding === false}
+                                                                onChange={(e) => {
+                                                                    const newFormData = { ...formData, useRounding: e.target.value === 'true' };
+                                                                    setFormData(newFormData);
+                                                                    setIsAutoCalculating(true);
+                                                                    debouncedAutoCalculate(newFormData);
+                                                                }}
+                                                                className="mr-2"
+                                                            />
+                                                            <span className="text-sm mr-2">向下取整</span> 
+                                                            <span className="text-xs text-gray-500">跌幅按大于等于最小跌幅计算份额</span>
+                                                        </label>
                                             </div>
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                四舍五入：跌幅按最小跌幅四舍五入计算份额<br />
-                                                向下取整：跌幅按大于等于最小跌幅计算份额
-                                            </p>
                                         </div>
 
                                         <div>
@@ -660,10 +887,18 @@
                                         <div>
                                             <button
                                                 onClick={runSimulation}
-                                                disabled={loading}
-                                                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                                disabled={loading || isAutoCalculating}
+                                                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 flex items-center justify-center"
                                             >
-                                                {loading ? '运行中...' : '执行'}
+                                                {loading ? '运行中...' : isAutoCalculating ? (
+                                                    <>
+                                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        自动计算中...
+                                                    </>
+                                                ) : '执行'}
                                             </button>
                                         </div>
                                     </div>
@@ -685,9 +920,9 @@
                                                 </div>
                                                 <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getProfitColor(results.totalReturn)}`}>
-                                                        {results.totalReturn.toFixed(0)}元
+                                                        {results.totalReturn.toFixed(0)}
                                                     </div>
-                                                    <div className="text-sm text-gray-600">总盈亏金额</div>
+                                                    <div className="text-sm text-gray-600">总盈亏额</div>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className="text-2xl font-bold text-blue-600">
@@ -712,53 +947,93 @@
 
                                         {/* 每日详情表格 */}
                                         <div className="table-section bg-white rounded-lg shadow-md p-6">
-                                            <h2 className="text-xl font-semibold mb-4 text-gray-700">每日交易详情</h2>
-                                            <div className="sticky-table">
-                                                <table className="min-w-full table-auto compact-table">
-                                                    <thead>
-                                                        <tr className="bg-gray-50">
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易日</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">累计涨跌</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓涨幅</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓金额</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总资产</th>
-                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易信息</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white divide-y divide-gray-200">
-                                                        {results.dailyResults.map((day, index) => (
-                                                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                    第{day.day}天
-                                                                </td>
-                                                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
-                                                                    {day.changePercent.toFixed(2)}%
-                                                                </td>
-                                                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.cumulativeChange)}`}>
-                                                                    {day.cumulativeChange.toFixed(2)}%
-                                                                </td>
-                                                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
-                                                                    {day.currentGainPercent.toFixed(2)}%
-                                                                </td>
-                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                    {day.holdingValue.toFixed(0)}元
-                                                                    <span
-                                                                        className="text-xs"
-                                                                        dangerouslySetInnerHTML={{ __html: day.holdingValueDetail }}
-                                                                    />
-                                                                </td>
-                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                    {day.totalAssets.toFixed(0)}元
-                                                                </td>
-                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-blue-600">
-                                                                    {day.tradeInfo || '-'}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h2 className="text-xl font-semibold text-gray-700">详情</h2>
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => setViewMode('table')}
+                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                                            viewMode === 'table' 
+                                                                ? 'bg-blue-600 text-white' 
+                                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                        }`}
+                                                    >
+                                                        表格
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setViewMode('chart')}
+                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                                                            viewMode === 'chart' 
+                                                                ? 'bg-blue-600 text-white' 
+                                                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                        }`}
+                                                    >
+                                                        图表
+                                                    </button>
+                                                </div>
                                             </div>
+                                            {viewMode === 'table' ? (
+                                                <div className="sticky-table">
+                                                    <table className="min-w-full table-auto compact-table">
+                                                        <thead>
+                                                            <tr className="bg-gray-50">
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易日</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">累计涨跌</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓涨幅</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓额</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总资产</th>
+                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易信息</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="bg-white divide-y divide-gray-200">
+                                                            {results.dailyResults.map((day, index) => (
+                                                                <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                        {day.day}
+                                                                    </td>
+                                                                    <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
+                                                                        {day.changePercent > 0 ? '+' : ''}{day.changePercent.toFixed(2)}%
+                                                                    </td>
+                                                                    <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.cumulativeChange)}`}>
+                                                                        {day.cumulativeChange > 0 ? '+' : ''}{day.cumulativeChange.toFixed(2)}%
+                                                                    </td>
+                                                                    <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
+                                                                        {day.currentGainPercent > 0 ? '+' : ''}{day.currentGainPercent.toFixed(2)}%
+                                                                    </td>
+                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                        {day.holdingValue.toFixed(0)}
+                                                                        <span
+                                                                            className="text-xs"
+                                                                            dangerouslySetInnerHTML={{ __html: day.holdingValueDetail }}
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                        {day.totalAssets.toFixed(0)}
+                                                                    </td>
+                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-blue-600">
+                                                                        {day.tradeInfo || '-'}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <div className="chart-container">
+                                                    <div className="mb-2 flex items-center justify-center space-x-6 text-xs text-gray-600">
+                                                        <div className="flex items-center space-x-1">
+                                                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                                            <span>买入操作</span>
+                                                        </div>
+                                                        <div className="flex items-center space-x-1">
+                                                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                                            <span>卖出操作</span>
+                                                        </div>
+                                                    </div>
+                                                    <TrendChart data={results} />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ) : (
@@ -801,10 +1076,9 @@
                                                     onChange={(e) => setColorMode(e.target.value)}
                                                     className="mr-3"
                                                 />
-                                                <span className="text-sm">标准模式</span>
-                                                <span className="ml-2 text-xs text-yellow-700">
-                                                    上涨显示绿色，下跌显示红色
-                                                </span>
+                                                <span className="text-sm mr-2">标准模式</span>
+                                                <span className="text-xs text-green-500 mr-2">+1</span>
+                                                <span className="text-xs text-red-500">-1</span>
                                             </label>
                                             <label className="flex items-center">
                                                 <input
@@ -815,10 +1089,9 @@
                                                     onChange={(e) => setColorMode(e.target.value)}
                                                     className="mr-3"
                                                 />
-                                                <span className="text-sm">翻转模式</span>
-                                                <span className="ml-2 text-xs text-yellow-700">
-                                                    上涨显示红色，下跌显示绿色
-                                                </span>
+                                                <span className="text-sm mr-2">翻转模式</span>
+                                                <span className="text-xs text-red-500 mr-2">+1</span>
+                                                <span className="text-xs text-green-500">-1</span>
                                             </label>
                                         </div>
                                     </div>
