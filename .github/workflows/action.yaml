@@ -16,32 +16,15 @@ jobs:
         id: date
         run: echo "::set-output name=tag::$(date +'live-%Y%m%d%H%M%S')"
 
-      - name: Use Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Cache Node Modules
-        uses: actions/cache@v2
-        with:
-          path: node_modules
-          key: node-modules-${{ hashFiles('yarn.lock') }}
-
-      - name: Install Packages
-        run: yarn
-
-      - name: Build
-        run: yarn build
-
       - name: Build the Docker image
         run: |
           docker version
           # 登录阿里云镜像仓库
           docker login --username=wangxiaoshou666 --password=${{ secrets.DOCKER_PASSWORD }} registry.cn-shenzhen.aliyuncs.com
           # 使用Dockerfile构建镜像
-          docker build . --file Dockerfile --tag registry.cn-shenzhen.aliyuncs.com/sliwei/itime-serve:${{ steps.date.outputs.tag }}
+          docker build . --file Dockerfile --tag registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${{ steps.date.outputs.tag }}
           # 推送镜像到镜像仓库
-          docker push registry.cn-shenzhen.aliyuncs.com/sliwei/itime-serve:${{ steps.date.outputs.tag }}
+          docker push registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${{ steps.date.outputs.tag }}
 
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@v1.0.3
@@ -51,11 +34,11 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           script: |
-            mkdir -p /data/docker/awei/itime-serve
-            cd /data/docker/awei/itime-serve
+            mkdir -p /data/docker/awei/jj-serve
+            cd /data/docker/awei/jj-serve
             # 登录阿里云镜像仓库
             docker login --username=wangxiaoshou666 --password=${{ secrets.DOCKER_PASSWORD }} registry.cn-shenzhen.aliyuncs.com
-            docker pull registry.cn-shenzhen.aliyuncs.com/sliwei/itime-serve:${{ steps.date.outputs.tag }}
+            docker pull registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${{ steps.date.outputs.tag }}
             export TAG=${{ steps.date.outputs.tag }}
             echo $TAG
             printf "${{ secrets.DOCKER_COMPOSE_YML }}" > docker-compose.yml

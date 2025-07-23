@@ -1,0 +1,18 @@
+services:
+  jj-serve:
+    restart: always
+    container_name: jj-serve
+    image: registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:$TAG
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+    # ports:
+    #   - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

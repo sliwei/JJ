@@ -1,18 +1,24 @@
-FROM node:18.16.0-alpine
+# 使用Python 3.11官方镜像
+FROM python:3.11-slim
 
+# 设置时区
 ENV TZ "Asia/Shanghai"
 
-COPY dist /www/dist
-COPY views /www/views
-COPY public /www/public
-COPY node_modules /www/node_modules
+# 设置工作目录
+WORKDIR /app
 
-# 设置变量，其他变量在启动时传入
-# xxx1=xxx1
-# xxx2=xxx2
+# 复制依赖文件并安装依赖
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-WORKDIR /www
+# 复制项目文件
+COPY fund_api.py .
+COPY start_api.py .
+COPY test_api.py .
+COPY index.html .
 
-EXPOSE 3000
+# 暴露端口
+EXPOSE 8080
 
-CMD ["node", "dist/index.js"]
+# 启动命令
+CMD ["python", "fund_api.py"]
