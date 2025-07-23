@@ -1,21 +1,145 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>模拟器</title>
+    <title>JJ模拟器</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 固定表头样式 */
+        .sticky-table {
+            position: relative;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+        }
+
+        .sticky-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #f9fafb;
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 缩小表格间距 */
+        .compact-table td,
+        .compact-table th {
+            padding: 0.25rem 0.5rem !important;
+        }
+
+        /* 确保滚动条样式 */
+        .sticky-table::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .sticky-table::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+
+        .sticky-table::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .sticky-table::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* 固定页面高度样式 */
+        .fixed-height-container {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .content-area {
+            height: calc(100vh - 120px);
+            overflow: hidden;
+        }
+
+        .left-panel {
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .right-panel {
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .results-area {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-section {
+            flex-shrink: 0;
+        }
+
+        .table-section {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .table-section .sticky-table {
+            flex: 1;
+            max-height: none;
+        }
+
+        /* 设置弹窗样式 */
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-content {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        /* 动态盈亏颜色类 */
+        .profit-color {
+            color: var(--profit-color);
+        }
+
+        .loss-color {
+            color: var(--loss-color);
+        }
+    </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // 模拟器类
+        // JJ模拟器类
         class StockTradingSimulator {
             constructor(totalCapital, buyAmountPerPoint, minBuyDropPercent, useRounding, sellThreshold, sellRatio) {
                 this.originalCapital = totalCapital;
@@ -116,7 +240,8 @@
                 const soldInvestment = (sellShares / totalShares) * this.totalInvested;
                 const profit = sellAmount - soldInvestment;
 
-                this.dailyTradeInfo = `卖出${this.sellRatio}%(${sellAmount.toFixed(0)}元,盈利${profit.toFixed(0)}元)`;
+                const profitText = profit >= 0 ? `盈利${profit.toFixed(0)}元` : `亏损${Math.abs(profit).toFixed(0)}元`;
+                this.dailyTradeInfo = `卖出${this.sellRatio}%(${sellAmount.toFixed(0)}元,${profitText})`;
 
                 // 按比例减少持仓
                 this.positions = this.positions.map(pos => ({
@@ -147,17 +272,88 @@
                 const totalAssets = this.remainingCapital + currentValue;
 
                 let currentGainPercent = 0;
+                let holdingValueDetail = '';
+                let todayBuyAmount = 0;
+                let todaySellAmount = 0;
+
+                // 获取今日买入金额
+                if (this.dailyTradeInfo.includes('买入')) {
+                    const match = this.dailyTradeInfo.match(/买入.*?\((\d+)元\)/);
+                    if (match) {
+                        todayBuyAmount = parseFloat(match[1]);
+                    }
+                }
+
+                // 获取今日卖出金额（实际卖出的金额，不是盈亏）
+                if (this.dailyTradeInfo.includes('卖出')) {
+                    const match = this.dailyTradeInfo.match(/卖出.*?\((\d+)元/);
+                    if (match) {
+                        todaySellAmount = parseFloat(match[1]);
+                    }
+                }
+
+                // 计算昨日持仓金额
+                let yesterdayHoldingValue = 0;
+                if (this.dayCounter > 1) {
+                    const yesterdayResult = this.dailyResults[this.dailyResults.length - 1];
+                    if (yesterdayResult) {
+                        yesterdayHoldingValue = yesterdayResult.holdingValue;
+                    }
+                }
+
+                // 计算当日盈亏（基于价格变化）
+                let todayGainLoss = 0;
+                if (yesterdayHoldingValue > 0 && changePercent !== 0) {
+                    todayGainLoss = yesterdayHoldingValue * (changePercent / 100);
+                }
+
                 if (totalShares > 0) {
                     const totalAmount = this.positions.reduce((sum, pos) => sum + pos.amount, 0);
                     const avgBuyPrice = totalAmount / totalShares;
                     currentGainPercent = ((this.currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
                 }
 
+                // 构建详细信息
+                if (currentValue > 0 || todayBuyAmount > 0 || todaySellAmount > 0) {
+                    let detailParts = [];
+
+                    // 昨日持仓（灰色）- 第一天显示为0
+                    const baseValue = this.dayCounter === 1 ? 0 : yesterdayHoldingValue;
+                    detailParts.push(`<span class="text-gray-500">本${baseValue.toFixed(0)}</span>`);
+
+                    // 当日盈亏（根据设置颜色显示）
+                    if (todayGainLoss !== 0) {
+                        const gainLossSign = todayGainLoss >= 0 ? ' + ' : ' - ';
+                        const gainLossClass = todayGainLoss >= 0 ? 'profit-color' : 'loss-color';
+                        const gainLossText = todayGainLoss >= 0 ? `赚${todayGainLoss.toFixed(0)}` : `亏${Math.abs(todayGainLoss).toFixed(0)}`;
+                        detailParts.push(`${gainLossSign}<span class="${gainLossClass}">${gainLossText}</span>`);
+                    }
+
+                    // 今日买入（紫色）
+                    if (todayBuyAmount > 0) {
+                        detailParts.push(` + <span class="text-blue-600">买${todayBuyAmount.toFixed(0)}</span>`);
+                    }
+
+                    // 今日卖出（紫色）
+                    if (todaySellAmount > 0) {
+                        detailParts.push(` - <span class="text-blue-600">卖${todaySellAmount.toFixed(0)}</span>`);
+                    }
+
+                    if (detailParts.length > 0) {
+                        holdingValueDetail = `(${detailParts.join('')})`;
+                    }
+                }
+
+                // 计算累计涨跌幅
+                const cumulativeChange = ((this.currentPrice - 1) / 1) * 100;
+
                 this.dailyResults.push({
                     day: this.dayCounter,
                     changePercent: changePercent,
+                    cumulativeChange: cumulativeChange,
                     currentGainPercent: currentGainPercent,
                     holdingValue: currentValue,
+                    holdingValueDetail: holdingValueDetail,
                     totalAssets: totalAssets,
                     tradeInfo: this.dailyTradeInfo,
                     currentPrice: this.currentPrice,
@@ -211,6 +407,7 @@
             const [selectedFile, setSelectedFile] = useState(null);
             const [fileData, setFileData] = useState(null);
             const [colorMode, setColorMode] = useState('reversed'); // 'standard' 或 'reversed'
+            const [showSettings, setShowSettings] = useState(false); // 控制设置弹窗显示
 
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
@@ -229,6 +426,10 @@
                         try {
                             const data = JSON.parse(event.target.result);
                             setFileData(data);
+                            // 文件加载成功后自动运行模拟
+                            setTimeout(() => {
+                                runSimulationWithData(data);
+                            }, 100);
                         } catch (error) {
                             console.error('JSON文件解析失败:', error);
                             alert('JSON文件格式错误，请检查文件内容');
@@ -243,8 +444,7 @@
             const getDefaultData = () => {
                 return [
                     -2.5, -1.8, -3.2, 1.5, -1.2, -2.1, -1.5, 2.3, -1.8, -2.8,
-                    -1.1, 3.2, -2.5, -1.9, 4.1, -1.3, -2.7, 1.8, -1.6, 5.5,
-                    -1.4, -2.2, 2.1, -1.7, -3.1, 1.9, -2.3, -1.8, 4.8, 6.2
+                    -1.1, 3.2, -2.5, -1.9, 4.1, -1.3, -2.7, 1.8, -1.6, 5.5
                 ];
             };
 
@@ -270,11 +470,10 @@
                 }
             };
 
-            const runSimulation = () => {
+            const runSimulationWithData = (data) => {
                 setLoading(true);
                 try {
-                    // 使用文件数据或默认数据
-                    const dailyChanges = fileData || getDefaultData();
+                    const dailyChanges = data || fileData || getDefaultData();
 
                     if (!dailyChanges || dailyChanges.length === 0) {
                         alert('请先选择有效的JSON数据文件');
@@ -301,250 +500,332 @@
                 }
             };
 
+            const runSimulation = () => {
+                runSimulationWithData(null);
+            };
+
+            // 设置CSS变量
+            React.useEffect(() => {
+                const root = document.documentElement;
+                if (colorMode === 'standard') {
+                    root.style.setProperty('--profit-color', '#16a34a'); // green-600
+                    root.style.setProperty('--loss-color', '#dc2626'); // red-600
+                } else {
+                    root.style.setProperty('--profit-color', '#dc2626'); // red-600
+                    root.style.setProperty('--loss-color', '#16a34a'); // green-600
+                }
+            }, [colorMode]);
+
+            // 页面加载时自动运行一次默认数据的模拟
+            React.useEffect(() => {
+                runSimulationWithData(getDefaultData());
+            }, []);
+
             return (
-                <div className="container mx-auto p-6 max-w-7xl">
-                    <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">模拟器</h1>
-                    
-                    {/* 页面设置 */}
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                        <h2 className="text-xl font-semibold mb-4 text-gray-700">页面设置</h2>
-                        <div className="flex items-center space-x-4">
-                            <label className="block text-sm font-medium text-gray-700">
-                                颜色模式:
-                            </label>
-                            <div className="flex space-x-4">
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        name="colorMode"
-                                        value="standard"
-                                        checked={colorMode === 'standard'}
-                                        onChange={(e) => setColorMode(e.target.value)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">标准模式</span>
-                                </label>
-                                <label className="flex items-center">
-                                    <input
-                                        type="radio"
-                                        name="colorMode"
-                                        value="reversed"
-                                        checked={colorMode === 'reversed'}
-                                        onChange={(e) => setColorMode(e.target.value)}
-                                        className="mr-2"
-                                    />
-                                    <span className="text-sm">翻转模式</span>
-                                </label>
+                <div className="fixed-height-container">
+                    <div className="container mx-auto p-6 max-w-full">
+                        {/* 标题栏和设置按钮 */}
+                        <div className="flex justify-between items-center mb-6">
+                            <h1 className="text-3xl font-bold text-gray-800">JJ模拟器</h1>
+                            <button
+                                onClick={() => setShowSettings(true)}
+                                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center space-x-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span>设置</span>
+                            </button>
+                        </div>
+
+                        <div className="content-area flex flex-col lg:flex-row gap-6">
+                            {/* 左侧：参数设置区域 */}
+                            <div className="lg:w-1/3 left-panel">
+                                <div className="bg-white rounded-lg shadow-md p-6 h-full">
+                                    <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟参数</h2>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                总金额 (元)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="totalCapital"
+                                                value={formData.totalCapital}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                最小买入跌幅 (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                name="minBuyDropPercent"
+                                                value={formData.minBuyDropPercent}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                每份额买入金额 (元)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="buyAmountPerPoint"
+                                                value={formData.buyAmountPerPoint}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                卖出阈值 (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="sellThreshold"
+                                                value={formData.sellThreshold}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                卖出比例 (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                name="sellRatio"
+                                                value={formData.sellRatio}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                份额计算方式
+                                            </label>
+                                            <div className="flex space-x-4 mt-2">
+                                                <label className="flex items-center">
+                                                    <input
+                                                        type="radio"
+                                                        name="useRounding"
+                                                        value="true"
+                                                        checked={formData.useRounding === true}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, useRounding: e.target.value === 'true' }))}
+                                                        className="mr-2"
+                                                    />
+                                                    <span className="text-sm">四舍五入</span>
+                                                </label>
+                                                <label className="flex items-center">
+                                                    <input
+                                                        type="radio"
+                                                        name="useRounding"
+                                                        value="false"
+                                                        checked={formData.useRounding === false}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, useRounding: e.target.value === 'true' }))}
+                                                        className="mr-2"
+                                                    />
+                                                    <span className="text-sm">向下取整</span>
+                                                </label>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                四舍五入：跌幅按最小跌幅四舍五入计算份额<br />
+                                                向下取整：跌幅按大于等于最小跌幅计算份额
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                数据文件 (JSON格式)
+                                            </label>
+                                            <input
+                                                type="file"
+                                                accept=".json"
+                                                onChange={handleFileChange}
+                                                className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <button
+                                                onClick={runSimulation}
+                                                disabled={loading}
+                                                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                            >
+                                                {loading ? '运行中...' : '执行'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 右侧：结果展示区域 */}
+                            <div className="lg:w-2/3 right-panel">
+                                {results ? (
+                                    <div className="results-area">
+                                        {/* 总结信息 */}
+                                        <div className="summary-section bg-white rounded-lg shadow-md p-6 mb-6">
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                                <div className="text-center">
+                                                    <div className={`text-2xl font-bold ${getProfitColor(results.returnPercent)}`}>
+                                                        {results.returnPercent.toFixed(2)}%
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">收益率</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className={`text-2xl font-bold ${getProfitColor(results.totalReturn)}`}>
+                                                        {results.totalReturn.toFixed(0)}元
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">总盈亏金额</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-blue-600">
+                                                        {results.dailyResults.length}天
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">总天数</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className={`text-2xl font-bold ${getChangeColor(results.totalPriceChange)}`}>
+                                                        {results.totalPriceChange.toFixed(2)}%
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">总涨跌幅</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-purple-600">
+                                                        {results.buyCount}/{results.sellCount}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">买入/卖出次数</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 每日详情表格 */}
+                                        <div className="table-section bg-white rounded-lg shadow-md p-6">
+                                            <h2 className="text-xl font-semibold mb-4 text-gray-700">每日交易详情</h2>
+                                            <div className="sticky-table">
+                                                <table className="min-w-full table-auto compact-table">
+                                                    <thead>
+                                                        <tr className="bg-gray-50">
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易日</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">累计涨跌</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓涨幅</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓金额</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总资产</th>
+                                                            <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易信息</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white divide-y divide-gray-200">
+                                                        {results.dailyResults.map((day, index) => (
+                                                            <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                    第{day.day}天
+                                                                </td>
+                                                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
+                                                                    {day.changePercent.toFixed(2)}%
+                                                                </td>
+                                                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.cumulativeChange)}`}>
+                                                                    {day.cumulativeChange.toFixed(2)}%
+                                                                </td>
+                                                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
+                                                                    {day.currentGainPercent.toFixed(2)}%
+                                                                </td>
+                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                    {day.holdingValue.toFixed(0)}元
+                                                                    <span
+                                                                        className="text-xs"
+                                                                        dangerouslySetInnerHTML={{ __html: day.holdingValueDetail }}
+                                                                    />
+                                                                </td>
+                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                    {day.totalAssets.toFixed(0)}元
+                                                                </td>
+                                                                <td className="px-2 py-1 whitespace-nowrap text-sm text-blue-600">
+                                                                    {day.tradeInfo || '-'}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-white rounded-lg shadow-md p-6 h-full flex items-center justify-center">
+                                        <div className="text-center text-gray-500">
+                                            <p className="text-lg mb-2">请设置参数并点击"开始模拟"查看结果</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
+
+                        {/* 设置弹窗 */}
+                        {showSettings && (
+                            <div className="settings-modal" onClick={() => setShowSettings(false)}>
+                                <div className="settings-content" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-semibold text-gray-700">页面设置</h3>
+                                        <button
+                                            onClick={() => setShowSettings(false)}
+                                            className="text-gray-400 hover:text-gray-600"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                                            颜色模式:
+                                        </label>
+                                        <div className="space-y-2">
+                                            <label className="flex items-center">
+                                                <input
+                                                    type="radio"
+                                                    name="colorMode"
+                                                    value="standard"
+                                                    checked={colorMode === 'standard'}
+                                                    onChange={(e) => setColorMode(e.target.value)}
+                                                    className="mr-3"
+                                                />
+                                                <span className="text-sm">标准模式</span>
+                                                <span className="ml-2 text-xs text-yellow-700">
+                                                    上涨显示绿色，下跌显示红色
+                                                </span>
+                                            </label>
+                                            <label className="flex items-center">
+                                                <input
+                                                    type="radio"
+                                                    name="colorMode"
+                                                    value="reversed"
+                                                    checked={colorMode === 'reversed'}
+                                                    onChange={(e) => setColorMode(e.target.value)}
+                                                    className="mr-3"
+                                                />
+                                                <span className="text-sm">翻转模式</span>
+                                                <span className="ml-2 text-xs text-yellow-700">
+                                                    上涨显示红色，下跌显示绿色
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                    {/* 参数表单 */}
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                        <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟参数设置</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    总金额 (元)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="totalCapital"
-                                    value={formData.totalCapital}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    每份额买入金额 (元)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="buyAmountPerPoint"
-                                    value={formData.buyAmountPerPoint}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    最小买入跌幅 (%)
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    name="minBuyDropPercent"
-                                    value={formData.minBuyDropPercent}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    卖出阈值 (%)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="sellThreshold"
-                                    value={formData.sellThreshold}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    卖出比例 (%)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="sellRatio"
-                                    value={formData.sellRatio}
-                                    onChange={handleInputChange}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    份额计算方式
-                                </label>
-                                <div className="flex space-x-4 mt-2">
-                                    <label className="flex items-center">
-                                        <input
-                                            type="radio"
-                                            name="useRounding"
-                                            value="true"
-                                            checked={formData.useRounding === true}
-                                            onChange={(e) => setFormData(prev => ({...prev, useRounding: e.target.value === 'true'}))}
-                                            className="mr-2"
-                                        />
-                                        <span className="text-sm">四舍五入</span>
-                                    </label>
-                                    <label className="flex items-center">
-                                        <input
-                                            type="radio"
-                                            name="useRounding"
-                                            value="false"
-                                            checked={formData.useRounding === false}
-                                            onChange={(e) => setFormData(prev => ({...prev, useRounding: e.target.value === 'true'}))}
-                                            className="mr-2"
-                                        />
-                                        <span className="text-sm">向下取整</span>
-                                    </label>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    四舍五入：跌幅按最小跌幅四舍五入计算份额<br/>
-                                    向下取整：跌幅按大于等于最小跌幅计算份额
-                                </p>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    测试数据文件 (JSON格式)
-                                </label>
-                                <input
-                                    type="file"
-                                    accept=".json"
-                                    onChange={handleFileChange}
-                                    className="w-full px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                />
-                            </div>
-                            
-                            <div className="flex items-end">
-                                <button
-                                    onClick={runSimulation}
-                                    disabled={loading}
-                                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                                >
-                                    {loading ? '运行中...' : '开始模拟'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 结果展示 */}
-                    {results && (
-                        <div className="space-y-6">
-                            {/* 总结信息 */}
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟结果总结</h2>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="text-center">
-                                        <div className={`text-2xl font-bold ${getChangeColor(results.totalPriceChange)}`}>
-                                            {results.totalPriceChange.toFixed(2)}%
-                                        </div>
-                                        <div className="text-sm text-gray-600">股价总涨跌幅</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className={`text-2xl font-bold ${getProfitColor(results.totalReturn)}`}>
-                                            {results.totalReturn.toFixed(0)}元
-                                        </div>
-                                        <div className="text-sm text-gray-600">总盈亏金额</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className={`text-2xl font-bold ${getProfitColor(results.returnPercent)}`}>
-                                            {results.returnPercent.toFixed(2)}%
-                                        </div>
-                                        <div className="text-sm text-gray-600">收益率</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-2xl font-bold text-purple-600">
-                                            {results.buyCount}/{results.sellCount}
-                                        </div>
-                                        <div className="text-sm text-gray-600">买入/卖出次数</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 每日详情表格 */}
-                            <div className="bg-white rounded-lg shadow-md p-6">
-                                <h2 className="text-xl font-semibold mb-4 text-gray-700">每日交易详情</h2>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full table-auto">
-                                        <thead>
-                                            <tr className="bg-gray-50">
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易日</th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当前涨幅</th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓金额</th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总资产</th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易信息</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {results.dailyResults.map((day, index) => (
-                                                <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                                        第{day.day}天
-                                                    </td>
-                                                    <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
-                                                        {day.changePercent.toFixed(2)}%
-                                                    </td>
-                                                    <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
-                                                        {day.currentGainPercent.toFixed(2)}%
-                                                    </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                                        {day.holdingValue.toFixed(0)}元
-                                                    </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                                        {day.totalAssets.toFixed(0)}元
-                                                    </td>
-                                                    <td className="px-4 py-2 whitespace-nowrap text-sm text-blue-600">
-                                                        {day.tradeInfo || '-'}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         }
@@ -552,4 +833,5 @@
         ReactDOM.render(<StockTradingApp />, document.getElementById('root'));
     </script>
 </body>
+
 </html>
