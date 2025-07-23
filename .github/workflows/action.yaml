@@ -19,12 +19,36 @@ jobs:
       - name: Build the Docker image
         run: |
           docker version
-          # 登录阿里云镜像仓库
-          docker login --username=wangxiaoshou666 --password=${{ secrets.DOCKER_PASSWORD }} registry.cn-shenzhen.aliyuncs.com
+          # 登录阿里云镜像仓库，增加重试机制
+          for i in {1..3}; do
+            echo "尝试登录阿里云镜像仓库，第 $i 次"
+            if docker login --username=wangxiaoshou666 --password=${{ secrets.DOCKER_PASSWORD }} registry.cn-shenzhen.aliyuncs.com; then
+              echo "登录成功"
+              break
+            else
+              echo "登录失败，等待30秒后重试"
+              sleep 30
+            fi
+          done
+          
           # 使用Dockerfile构建镜像
           docker build . --file Dockerfile --tag registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${{ steps.date.outputs.tag }}
-          # 推送镜像到镜像仓库
-          docker push registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${{ steps.date.outputs.tag }}
+          
+          # 推送镜像到镜像仓库，增加重试机制
+          for i in {1..5}; do
+            echo "尝试推送镜像，第 $i 次"
+            if docker push registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${{ steps.date.outputs.tag }}; then
+              echo "推送成功"
+              break
+            else
+              echo "推送失败，等待60秒后重试"
+              sleep 60
+            fi
+            if [ $i -eq 5 ]; then
+              echo "推送失败，已达到最大重试次数"
+              exit 1
+            fi
+          done
 
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@v1.0.3
