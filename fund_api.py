@@ -5,12 +5,13 @@
 使用AKShare获取基金历史数据
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import akshare as ak
 import pandas as pd
 from datetime import datetime
 import traceback
+import os
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -206,6 +207,20 @@ def health_check():
         'status': 'healthy',
         'message': '基金数据API服务运行正常'
     })
+
+@app.route('/jj')
+def jj_page():
+    """JJ Simulator页面入口"""
+    try:
+        # 获取当前脚本所在目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        # 发送index.html文件
+        return send_from_directory(current_dir, 'index.html')
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'页面加载失败: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     print("启动基金数据API服务...")
