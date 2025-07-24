@@ -9,12 +9,133 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import akshare as ak
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import traceback
 import os
+import json
+import time
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
+
+# 基金列表缓存
+fund_list_cache = {
+    'data': None,
+    'timestamp': 0,
+    'cache_duration': 3600  # 1小时缓存
+}
+
+@app.route('/api/fund_list', methods=['GET'])
+def get_fund_list():
+    """
+    获取开放式基金列表，支持模糊搜索
+    参数:
+        query: 搜索关键词，支持基金代码或基金名称模糊匹配 (可选)
+        limit: 返回结果数量限制，默认20，最大100 (可选)
+    """
+    try:
+        query = request.args.get('query', '').strip()
+        limit = min(int(request.args.get('limit', 20)), 100)
+        
+        # 检查缓存是否有效
+        current_time = time.time()
+        if (fund_list_cache['data'] is None or 
+            current_time - fund_list_cache['timestamp'] > fund_list_cache['cache_duration']):
+            
+            print("正在获取基金列表数据...")
+            try:
+                # 使用fund_open_fund_daily_em获取开放式基金数据
+                fund_df = ak.fund_open_fund_daily_em()
+                
+                if fund_df.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': '无法获取基金列表数据'
+                    }), 500
+                
+                # 处理数据格式，提取需要的字段
+                fund_list = []
+                for _, row in fund_df.iterrows():
+                    try:
+                        fund_info = {
+                            'code': str(row.get('基金代码', '')),
+                            'name': str(row.get('基金简称', '')),
+                            'net_value': float(row.get('单位净值', 0)) if pd.notna(row.get('单位净值')) else 0,
+                            'daily_growth': float(row.get('日增长率', 0)) if pd.notna(row.get('日增长率')) else 0,
+                            'total_value': float(row.get('累计净值', 0)) if pd.notna(row.get('累计净值')) else 0
+                        }
+                        
+                        # 过滤掉无效数据
+                        if fund_info['code'] and fund_info['name']:
+                            fund_list.append(fund_info)
+                    except Exception as e:
+                        # 跳过有问题的数据行
+                        continue
+                
+                # 更新缓存
+                fund_list_cache['data'] = fund_list
+                fund_list_cache['timestamp'] = current_time
+                
+                print(f"成功获取 {len(fund_list)} 只基金数据")
+                
+            except Exception as e:
+                print(f"获取基金列表失败: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'获取基金列表失败: {str(e)}'
+                }), 500
+        else:
+            print("使用缓存的基金列表数据")
+        
+        # 从缓存中获取数据
+        fund_list = fund_list_cache['data']
+        
+        # 如果有搜索查询，进行模糊匹配
+        if query:
+            query_lower = query.lower()
+            filtered_funds = []
+            
+            for fund in fund_list:
+                # 匹配基金代码或基金名称
+                if (query_lower in fund['code'].lower() or 
+                    query_lower in fund['name'].lower()):
+                    filtered_funds.append(fund)
+            
+            # 按匹配度排序：代码完全匹配 > 代码开头匹配 > 名称开头匹配 > 其他匹配
+            def sort_key(fund):
+                code_lower = fund['code'].lower()
+                name_lower = fund['name'].lower()
+                
+                if code_lower == query_lower:
+                    return (0, fund['code'])  # 代码完全匹配
+                elif code_lower.startswith(query_lower):
+                    return (1, fund['code'])  # 代码开头匹配
+                elif name_lower.startswith(query_lower):
+                    return (2, fund['name'])  # 名称开头匹配
+                else:
+                    return (3, fund['name'])  # 其他匹配
+            
+            filtered_funds.sort(key=sort_key)
+            result_funds = filtered_funds[:limit]
+        else:
+            # 没有查询条件，返回前limit个基金
+            result_funds = fund_list[:limit]
+        
+        return jsonify({
+            'success': True,
+            'data': result_funds,
+            'total_count': len(fund_list),
+            'returned_count': len(result_funds),
+            'cache_time': datetime.fromtimestamp(fund_list_cache['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+        })
+        
+    except Exception as e:
+        print(f"基金列表API错误: {e}")
+        print(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': f'服务器内部错误: {str(e)}'
+        }), 500
 
 @app.route('/api/fund_data', methods=['GET'])
 def get_fund_data():
