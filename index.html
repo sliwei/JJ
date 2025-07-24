@@ -167,7 +167,8 @@
 
             processDailyChange(changePercent, date, netValue) {
                 this.dailyTradeInfo = '';
-                this.currentPrice = netValue;
+                // 基于涨跌幅累积计算价格，而不是直接使用净值
+                this.currentPrice = this.currentPrice * (1 + changePercent / 100);
 
                 if (changePercent < 0 && this.remainingCapital > 0) {
                     this.buyStock(Math.abs(changePercent));
@@ -361,7 +362,15 @@
             }
 
             simulate(fundDataArray) {
+                // 重置所有状态变量，确保每次模拟都从初始状态开始
+                this.remainingCapital = this.originalCapital;
+                this.positions = [];
+                this.currentPrice = 1;
+                this.totalInvested = 0;
+                this.tradingLog = [];
+                this.dailyTradeInfo = '';
                 this.dailyResults = [];
+                
                 fundDataArray.forEach((fundData) => {
                     this.processDailyChange(fundData.daily_growth, fundData.date, fundData.net_value);
                 });
