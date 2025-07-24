@@ -25,6 +25,7 @@
 - **CSS 变量管理**：集中管理所有主题相关的颜色
 - **样式类重用**：创建可重用的样式类
 - **维护性提升**：便于后续主题扩展和维护
+- **固定头部设计**：收藏列表头部固定在顶部，不随内容滚动
 
 ## 🔧 技术实现
 
@@ -73,6 +74,9 @@ React.useEffect(() => {
   background-color: var(--dropdown-header-bg);
   color: var(--dropdown-header-text);
   border-color: var(--dropdown-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 /* 下拉框项目样式 */
@@ -222,6 +226,7 @@ React.useEffect(() => {
 - ✅ 文本颜色层次清晰，易于阅读
 - ✅ 边框和分割线颜色统一
 - ✅ 悬停效果与页面其他元素一致
+- ✅ 收藏列表头部固定显示，提升浏览体验
 
 ### 交互体验
 

@@ -190,6 +190,9 @@
         background-color: var(--dropdown-header-bg);
         color: var(--dropdown-header-text);
         border-color: var(--dropdown-border);
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
 
       /* 下拉框项目样式 */
@@ -993,6 +996,24 @@
           });
         };
 
+        // 清空基金输入框
+        const handleClearFundCode = () => {
+          setFormData({
+            ...formData,
+            fundCode: "",
+          });
+          setFundSearchResults([]);
+          setShowFundDropdown(false);
+          setShowFavorites(false);
+          setSelectedFund(null);
+          // 重新聚焦输入框
+          setTimeout(() => {
+            if (fundSearchRef.current) {
+              fundSearchRef.current.focus();
+            }
+          }, 0);
+        };
+
         // 处理回车键查询数据
         const handleKeyDown = (e) => {
           if (e.key === "Enter") {
@@ -1317,6 +1338,7 @@
                         </Tooltip>
                         <div className="relative">
                           <input
+                            ref={fundSearchRef}
                             type="text"
                             name="fundCode"
                             value={formData.fundCode || ""}
@@ -1326,11 +1348,15 @@
                             onClick={handleFundCodeClick}
                             onKeyDown={handleKeyDown}
                             placeholder="输入基金代码或名称搜索"
-                            className="w-full px-2 py-1.5 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              (formData.fundCode && formData.fundCode.trim()) || fundSearchLoading ? "pr-16" : "pr-8"
+                            }`}
                             autoComplete="off"
                           />
+
+                          {/* 加载动画 */}
                           {fundSearchLoading && (
-                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                            <div className="absolute right-8 top-1/2 transform -translate-y-1/2">
                               <svg
                                 className="animate-spin h-4 w-4 text-gray-400"
                                 xmlns="http://www.w3.org/2000/svg"
@@ -1352,6 +1378,23 @@
                                 ></path>
                               </svg>
                             </div>
+                          )}
+
+                          {/* 清空按钮 */}
+                          {formData.fundCode && formData.fundCode.trim() && (
+                            <button
+                              onClick={handleClearFundCode}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="清空输入"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
                           )}
                         </div>
 
