@@ -163,6 +163,8 @@
       .fund-dropdown {
         scrollbar-width: thin;
         scrollbar-color: #cbd5e1 #f1f5f9;
+        background-color: var(--dropdown-bg);
+        border: 1px solid var(--dropdown-border);
       }
 
       .fund-dropdown::-webkit-scrollbar {
@@ -181,6 +183,28 @@
 
       .fund-dropdown::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
+      }
+
+      /* 下拉框头部样式 */
+      .dropdown-header {
+        background-color: var(--dropdown-header-bg);
+        color: var(--dropdown-header-text);
+        border-color: var(--dropdown-border);
+      }
+
+      /* 下拉框项目样式 */
+      .dropdown-item {
+        background-color: var(--dropdown-bg);
+        color: var(--dropdown-item-text);
+        border-color: var(--dropdown-item-border);
+      }
+
+      .dropdown-item:hover {
+        background-color: var(--dropdown-item-hover);
+      }
+
+      .dropdown-item-subtext {
+        color: var(--dropdown-item-subtext);
       }
     </style>
   </head>
@@ -648,6 +672,8 @@
         const [fundSearchLoading, setFundSearchLoading] = useState(false);
         const [selectedFund, setSelectedFund] = useState(null);
         const fundSearchRef = useRef(null);
+        const fundDropdownRef = useRef(null); // 搜索结果下拉列表的引用
+        const favoriteDropdownRef = useRef(null); // 收藏列表下拉框的引用
 
         // 基金收藏相关状态
         const [favoriteFunds, setFavoriteFunds] = useState([]);
@@ -655,6 +681,7 @@
 
         // 基金搜索防抖函数
         const debouncedFundSearchRef = useRef(null);
+        const lastSearchQueryRef = useRef("");
 
         const searchFunds = async (query) => {
           if (!query || query.length < 1) {
@@ -662,6 +689,9 @@
             setShowFundDropdown(false);
             return;
           }
+
+          // 记录当前搜索的查询词
+          lastSearchQueryRef.current = query;
 
           setFundSearchLoading(true);
           try {
@@ -725,24 +755,55 @@
         // 处理输入框获得焦点
         const handleFundCodeFocus = () => {
           const currentValue = formData.fundCode?.trim() || "";
-          if (currentValue === "" && favoriteFunds.length > 0) {
-            // 使用setTimeout确保状态更新在下一个事件循环中执行
-            setTimeout(() => {
-              setShowFavorites(true);
-              setShowFundDropdown(false);
-              setFundSearchResults([]);
-            }, 0);
+          if (currentValue === "") {
+            // 输入框为空时显示收藏列表
+            if (favoriteFunds.length > 0) {
+              setTimeout(() => {
+                setShowFavorites(true);
+                setShowFundDropdown(false);
+                setFundSearchResults([]);
+              }, 0);
+            }
+          } else {
+            // 输入框有内容时恢复之前的搜索结果
+            if (fundSearchResults.length > 0 && lastSearchQueryRef.current === currentValue) {
+              // 如果搜索结果缓存存在且查询词匹配，直接显示缓存结果
+              setShowFundDropdown(true);
+              setShowFavorites(false);
+            } else {
+              // 如果没有缓存的搜索结果或查询词不匹配，重新搜索
+              debouncedFundSearch(currentValue);
+            }
           }
         };
 
         // 处理输入框点击事件
         const handleFundCodeClick = () => {
           const currentValue = formData.fundCode?.trim() || "";
-          if (currentValue === "" && favoriteFunds.length > 0) {
-            setShowFavorites(true);
-            setShowFundDropdown(false);
-            setFundSearchResults([]);
+          if (currentValue === "") {
+            // 输入框为空时显示收藏列表
+            if (favoriteFunds.length > 0) {
+              setShowFavorites(true);
+              setShowFundDropdown(false);
+              setFundSearchResults([]);
+            }
+          } else {
+            // 输入框有内容时恢复之前的搜索结果
+            if (fundSearchResults.length > 0 && lastSearchQueryRef.current === currentValue) {
+              // 如果搜索结果缓存存在且查询词匹配，直接显示缓存结果
+              setShowFundDropdown(true);
+              setShowFavorites(false);
+            } else {
+              // 如果没有缓存的搜索结果或查询词不匹配，重新搜索
+              debouncedFundSearch(currentValue);
+            }
           }
+        };
+
+        // 处理输入框失去焦点事件
+        const handleFundCodeBlur = () => {
+          // 失去焦点时不清除搜索结果，只是隐藏下拉框
+          // 下拉框的隐藏由点击外部事件处理
         };
 
         // 选择基金
@@ -754,7 +815,7 @@
           setSelectedFund(fund);
           setShowFundDropdown(false);
           setShowFavorites(false);
-          setFundSearchResults([]);
+          // 不清除搜索结果缓存，以便用户重新聚焦时可以看到之前的搜索结果
         };
 
         // 初始化收藏列表
@@ -770,6 +831,30 @@
             }
           }
         }, []);
+
+        // 监听搜索结果变化，自动滚动到顶部
+        useEffect(() => {
+          if (showFundDropdown && fundDropdownRef.current && fundSearchResults.length > 0) {
+            // 使用setTimeout确保DOM更新完成后再滚动
+            setTimeout(() => {
+              if (fundDropdownRef.current) {
+                fundDropdownRef.current.scrollTop = 0;
+              }
+            }, 0);
+          }
+        }, [fundSearchResults, showFundDropdown]);
+
+        // 监听收藏列表显示，自动滚动到顶部
+        useEffect(() => {
+          if (showFavorites && favoriteDropdownRef.current && favoriteFunds.length > 0) {
+            // 使用setTimeout确保DOM更新完成后再滚动
+            setTimeout(() => {
+              if (favoriteDropdownRef.current) {
+                favoriteDropdownRef.current.scrollTop = 0;
+              }
+            }, 0);
+          }
+        }, [showFavorites, favoriteFunds]);
 
         // 保存收藏列表到本地存储
         const saveFavoritesToStorage = (favorites) => {
@@ -806,6 +891,7 @@
         useEffect(() => {
           const handleClickOutside = (event) => {
             if (fundSearchRef.current && !fundSearchRef.current.contains(event.target)) {
+              // 只隐藏下拉框，不清除搜索结果缓存
               setShowFundDropdown(false);
               setShowFavorites(false);
             }
@@ -990,9 +1076,27 @@
           if (colorMode === "standard") {
             root.style.setProperty("--profit-color", "#16a34a"); // green-600
             root.style.setProperty("--loss-color", "#dc2626"); // red-600
+            // 下拉列表主题色
+            root.style.setProperty("--dropdown-bg", "#ffffff"); // 白色背景
+            root.style.setProperty("--dropdown-border", "#d1d1d1"); // gray-400 - 更明显的边框
+            root.style.setProperty("--dropdown-header-bg", "#f9fafb"); // gray-50
+            root.style.setProperty("--dropdown-header-text", "#6b7280"); // gray-500
+            root.style.setProperty("--dropdown-item-text", "#111827"); // gray-900
+            root.style.setProperty("--dropdown-item-subtext", "#6b7280"); // gray-500
+            root.style.setProperty("--dropdown-item-hover", "#f3f4f6"); // gray-100
+            root.style.setProperty("--dropdown-item-border", "#e5e7eb"); // gray-200 - 更明显的分割线
           } else {
             root.style.setProperty("--profit-color", "#dc2626"); // red-600
             root.style.setProperty("--loss-color", "#16a34a"); // green-600
+            // 下拉列表主题色（翻转模式保持一致的UI颜色）
+            root.style.setProperty("--dropdown-bg", "#ffffff"); // 白色背景
+            root.style.setProperty("--dropdown-border", "#d1d1d1"); // gray-400 - 更明显的边框
+            root.style.setProperty("--dropdown-header-bg", "#f9fafb"); // gray-50
+            root.style.setProperty("--dropdown-header-text", "#6b7280"); // gray-500
+            root.style.setProperty("--dropdown-item-text", "#111827"); // gray-900
+            root.style.setProperty("--dropdown-item-subtext", "#6b7280"); // gray-500
+            root.style.setProperty("--dropdown-item-hover", "#f3f4f6"); // gray-100
+            root.style.setProperty("--dropdown-item-border", "#e5e7eb"); // gray-200 - 更明显的分割线
           }
         }, [colorMode]);
 
@@ -1218,6 +1322,7 @@
                             value={formData.fundCode || ""}
                             onChange={handleFundCodeChange}
                             onFocus={handleFundCodeFocus}
+                            onBlur={handleFundCodeBlur}
                             onClick={handleFundCodeClick}
                             onKeyDown={handleKeyDown}
                             placeholder="输入基金代码或名称搜索"
@@ -1252,8 +1357,11 @@
 
                         {/* 收藏列表下拉框 */}
                         {showFavorites && favoriteFunds.length > 0 && (
-                          <div className="fund-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600 flex items-center">
+                          <div
+                            ref={favoriteDropdownRef}
+                            className="fund-dropdown absolute z-50 w-full mt-1 rounded-md shadow-lg max-h-[600px] overflow-y-auto"
+                          >
+                            <div className="dropdown-header px-3 py-2 border-b text-xs font-medium flex items-center">
                               <svg className="w-4 h-4 mr-1 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                               </svg>
@@ -1262,22 +1370,20 @@
                             {favoriteFunds.map((fund, index) => (
                               <div
                                 key={fund.code}
-                                className={`px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-100 last:border-b-0 ${
+                                className={`dropdown-item px-3 py-2 cursor-pointer border-b last:border-b-0 ${
                                   index === favoriteFunds.length - 1 ? "rounded-b-md" : ""
                                 }`}
                               >
                                 <div className="flex justify-between items-center">
                                   <div className="flex-1 min-w-0" onClick={() => handleFundSelect(fund)}>
-                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                    <div className="text-sm font-medium truncate">
                                       {fund.code} - {fund.name}
                                     </div>
                                     <div className="flex items-center space-x-2 mt-1">
-                                      <span className="text-xs text-gray-500">净值: {fund.net_value.toFixed(4)}</span>
-                                      <span
-                                        className={`text-xs font-medium ${
-                                          fund.daily_growth >= 0 ? "text-red-600" : "text-green-600"
-                                        }`}
-                                      >
+                                      <span className="dropdown-item-subtext text-xs">
+                                        净值: {fund.net_value.toFixed(4)}
+                                      </span>
+                                      <span className={`text-xs font-medium ${getChangeColor(fund.daily_growth)}`}>
                                         {fund.daily_growth >= 0 ? "+" : ""}
                                         {fund.daily_growth.toFixed(2)}%
                                       </span>
@@ -1307,26 +1413,27 @@
 
                         {/* 搜索结果下拉框 */}
                         {showFundDropdown && fundSearchResults.length > 0 && (
-                          <div className="fund-dropdown absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          <div
+                            ref={fundDropdownRef}
+                            className="fund-dropdown absolute z-50 w-full mt-1 rounded-md shadow-lg max-h-[600px] overflow-y-auto"
+                          >
                             {fundSearchResults.map((fund, index) => (
                               <div
                                 key={fund.code}
-                                className={`px-3 py-2 cursor-pointer hover:bg-gray-100 border-b border-gray-100 last:border-b-0 ${
+                                className={`dropdown-item px-3 py-2 cursor-pointer border-b last:border-b-0 ${
                                   index === 0 ? "rounded-t-md" : ""
                                 } ${index === fundSearchResults.length - 1 ? "rounded-b-md" : ""}`}
                               >
                                 <div className="flex justify-between items-center">
                                   <div className="flex-1 min-w-0" onClick={() => handleFundSelect(fund)}>
-                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                    <div className="text-sm font-medium truncate">
                                       {fund.code} - {fund.name}
                                     </div>
                                     <div className="flex items-center space-x-2 mt-1">
-                                      <span className="text-xs text-gray-500">净值: {fund.net_value.toFixed(4)}</span>
-                                      <span
-                                        className={`text-xs font-medium ${
-                                          fund.daily_growth >= 0 ? "text-red-600" : "text-green-600"
-                                        }`}
-                                      >
+                                      <span className="dropdown-item-subtext text-xs">
+                                        净值: {fund.net_value.toFixed(4)}
+                                      </span>
+                                      <span className={`text-xs font-medium ${getChangeColor(fund.daily_growth)}`}>
                                         {fund.daily_growth >= 0 ? "+" : ""}
                                         {fund.daily_growth.toFixed(2)}%
                                       </span>
