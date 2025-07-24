@@ -163,6 +163,7 @@
                 this.tradingLog = [];
                 this.dailyTradeInfo = '';
                 this.dailyResults = [];
+                this.maxHoldingValue = 0; // 记录历史最大持仓金额
             }
 
             processDailyChange(changePercent, date, netValue) {
@@ -271,6 +272,11 @@
                 const currentValue = totalShares * this.currentPrice;
                 const totalAssets = this.remainingCapital + currentValue;
 
+                // 更新历史最大持仓金额
+                if (currentValue > this.maxHoldingValue) {
+                    this.maxHoldingValue = currentValue;
+                }
+
                 let currentGainPercent = 0;
                 let holdingValueDetail = '';
                 let todayBuyAmount = 0;
@@ -370,6 +376,7 @@
                 this.tradingLog = [];
                 this.dailyTradeInfo = '';
                 this.dailyResults = [];
+                this.maxHoldingValue = 0; // 重置历史最大持仓金额
                 
                 fundDataArray.forEach((fundData) => {
                     this.processDailyChange(fundData.daily_growth, fundData.date, fundData.net_value);
@@ -382,7 +389,16 @@
                 const currentValue = totalShares * this.currentPrice;
                 const totalAssets = this.remainingCapital + currentValue;
                 const totalReturn = totalAssets - this.originalCapital;
-                const returnPercent = (totalReturn / this.originalCapital) * 100;
+                
+                // 修改收益率计算方式：基于历史最大持仓金额计算
+                let returnPercent = 0;
+                if (this.maxHoldingValue > 0) {
+                    returnPercent = (totalReturn / this.maxHoldingValue) * 100;
+                } else {
+                    // 如果没有持仓记录，使用原来的计算方式
+                    returnPercent = (totalReturn / this.originalCapital) * 100;
+                }
+                
                 const totalPriceChange = ((this.currentPrice - 1) / 1) * 100;
 
                 const sellTrades = this.tradingLog.filter(log => log.type === 'SELL_PARTIAL');
@@ -395,7 +411,8 @@
                     totalTradeProfit,
                     buyCount: this.tradingLog.filter(log => log.type === 'BUY').length,
                     sellCount: sellTrades.length,
-                    dailyResults: this.dailyResults
+                    dailyResults: this.dailyResults,
+                    maxHoldingValue: this.maxHoldingValue // 返回最大持仓金额供显示
                 };
             }
         }
@@ -413,8 +430,8 @@
             const defaultDates = getDefaultDateRange();
             
             const [formData, setFormData] = useState({
-                totalCapital: 10000,
-                buyAmountPerPoint: 100,
+                totalCapital: 100000,
+                buyAmountPerPoint: 1000,
                 minBuyDropPercent: 1.0,
                 useRounding: true,
                 sellThreshold: 5,
@@ -1105,18 +1122,24 @@
                                     <div className="results-area">
                                         {/* 总结信息 */}
                                         <div className="summary-section bg-white rounded-lg shadow-md p-6 mb-6">
-                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                                                 <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getProfitColor(results.returnPercent)}`}>
                                                         {results.returnPercent.toFixed(2)}%
                                                     </div>
-                                                    <div className="text-sm text-gray-600">模拟收益率</div>
+                                                    <div className="text-sm text-gray-600" title="基于最大持仓计算收益率">模拟收益率</div>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getProfitColor(results.totalReturn)}`}>
                                                         {results.totalReturn.toFixed(0)}
                                                     </div>
                                                     <div className="text-sm text-gray-600">总盈亏额</div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-2xl font-bold text-orange-600">
+                                                        {results.maxHoldingValue ? results.maxHoldingValue.toFixed(0) : '0'}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">最大持仓额</div>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className="text-2xl font-bold text-blue-600">
