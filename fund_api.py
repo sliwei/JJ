@@ -208,7 +208,7 @@ def health_check():
         'message': '基金数据API服务运行正常'
     })
 
-@app.route('/jj')
+@app.route('/')
 def jj_page():
     """JJ Simulator页面入口"""
     try:

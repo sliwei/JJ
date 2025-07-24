@@ -471,7 +471,7 @@
                 setLoading(true);
                 try {
                     // 构造API请求URL
-                    const apiUrl = `http://localhost:8080/api/fund_data?code=${formData.fundCode}&start_date=${formData.startDate || ''}&end_date=${formData.endDate || ''}`;
+                    const apiUrl = `/api/fund_data?code=${formData.fundCode}&start_date=${formData.startDate || ''}&end_date=${formData.endDate || ''}`;
                     
                     console.log('正在请求API:', apiUrl);
                     
