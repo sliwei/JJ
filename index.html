@@ -136,6 +136,29 @@
         .loss-color {
             color: var(--loss-color);
         }
+
+        /* Tooltip 样式 */
+        .tooltip-container {
+            display: inline-block;
+        }
+
+        .tooltip-content {
+            position: fixed;
+            background-color: #1f2937;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.4;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s, visibility 0.15s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-width: 300px;
+            white-space: normal;
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -144,6 +167,146 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
+
+        // Tooltip 组件
+        function Tooltip({ children, content, showIcon = false }) {
+            const [isVisible, setIsVisible] = useState(false);
+            const [position, setPosition] = useState({ x: 0, y: 0 });
+            const tooltipRef = useRef(null);
+
+            if (!content) return children;
+
+            const handleMouseEnter = (e) => {
+                setIsVisible(true);
+                updatePosition(e);
+            };
+
+            const handleMouseMove = (e) => {
+                if (isVisible) {
+                    updatePosition(e);
+                }
+            };
+
+            const handleMouseLeave = () => {
+                setIsVisible(false);
+            };
+
+            // 移动端支持
+            const handleTouchStart = (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                setIsVisible(true);
+                updatePosition({
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                });
+            };
+
+            const handleTouchEnd = () => {
+                setTimeout(() => setIsVisible(false), 2000); // 2秒后自动隐藏
+            };
+
+            const updatePosition = (e) => {
+                const offset = 10; // 距离鼠标的偏移量
+                let x = e.clientX + offset;
+                let y = e.clientY + offset;
+
+                // 使用requestAnimationFrame确保DOM更新后再计算位置
+                requestAnimationFrame(() => {
+                    const tooltipElement = tooltipRef.current;
+                    if (tooltipElement) {
+                        const rect = tooltipElement.getBoundingClientRect();
+                        const viewportWidth = window.innerWidth;
+                        const viewportHeight = window.innerHeight;
+
+                        // 如果右侧超出，则显示在鼠标左侧
+                        if (x + rect.width > viewportWidth) {
+                            x = e.clientX - rect.width - offset;
+                        }
+
+                        // 如果下方超出，则显示在鼠标上方
+                        if (y + rect.height > viewportHeight) {
+                            y = e.clientY - rect.height - offset;
+                        }
+
+                        // 确保不会超出左边界和上边界
+                        x = Math.max(offset, x);
+                        y = Math.max(offset, y);
+
+                        setPosition({ x, y });
+                    } else {
+                        setPosition({ x, y });
+                    }
+                });
+            };
+
+            return (
+                <>
+                    <div
+                        className="tooltip-container"
+                        onMouseEnter={handleMouseEnter}
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={handleMouseLeave}
+                        onTouchStart={handleTouchStart}
+                        onTouchEnd={handleTouchEnd}
+                    >
+                        <div className="flex items-center">
+                            {children}
+                            {showIcon && (
+                                <svg className="w-3 h-3 ml-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            )}
+                        </div>
+                    </div>
+                    {isVisible && (
+                        <div
+                            ref={tooltipRef}
+                            className="tooltip-content"
+                            style={{
+                                left: `${position.x}px`,
+                                top: `${position.y}px`,
+                                opacity: 1,
+                                visibility: 'visible'
+                            }}
+                        >
+                            {content}
+                        </div>
+                    )}
+                </>
+            );
+        }
+
+        // Tooltip 内容定义
+        const TOOLTIPS = {
+            // 参数设置相关
+            fundCode: "输入6位基金代码，如000001代表华夏成长混合基金",
+            startDate: "查询开始日期，格式为YYYYMMDD，如20230101",
+            endDate: "查询结束日期，格式为YYYYMMDD，如20231231",
+            totalCapital: "投资总资金额度，这是您可用于投资的全部资金",
+            buyAmountPerPoint: "每个份额对应的买入金额，当跌幅达到最小买入跌幅的整数倍时，会按此金额买入",
+            minBuyDropPercent: "触发买入操作的最小跌幅百分比，当日跌幅达到此值时开始买入",
+            sellThreshold: "触发卖出操作的盈利阈值，当持仓盈利达到此百分比时会卖出部分仓位",
+            sellRatio: "每次卖出操作的仓位比例，达到卖出条件时按此比例卖出持仓",
+            useRounding: "份额计算方式：四舍五入会按跌幅除以最小跌幅后四舍五入计算份额；向下取整则直接取整数部分",
+
+            // 结果展示相关
+            returnPercent: "模拟收益率，基于历史最大持仓金额计算，反映资金利用效率",
+            totalReturn: "总盈亏金额，当前总资产减去初始投资金额的差值",
+            maxHoldingValue: "历史最大持仓金额，整个投资期间持有基金的最大市值",
+            tradingDays: "交易日数，模拟期间的有效交易天数",
+            totalPriceChange: "区间涨跌幅，基金在整个模拟期间的净值变化百分比",
+            buyCount: "买入次数，模拟期间触发买入操作的总次数",
+            sellCount: "卖出次数，模拟期间触发卖出操作的总次数",
+
+            // 表格列头相关
+            dailyChange: "当日涨跌，该交易日基金净值的涨跌幅百分比",
+            cumulativeChange: "累计涨跌，从模拟开始至当日的累计涨跌幅",
+            holdingGain: "持仓涨幅，当前持仓相对于平均买入成本的盈亏百分比",
+            holdingValue: "持仓额，当前持有基金的市值金额",
+            totalAssets: "总资产，剩余现金加上持仓市值的总和",
+            tradeInfo: "交易信息，当日的买入或卖出操作详情"
+        };
 
         // JJ Simulator类
         class StockTradingSimulator {
@@ -377,7 +540,7 @@
                 this.dailyTradeInfo = '';
                 this.dailyResults = [];
                 this.maxHoldingValue = 0; // 重置历史最大持仓金额
-                
+
                 fundDataArray.forEach((fundData) => {
                     this.processDailyChange(fundData.daily_growth, fundData.date, fundData.net_value);
                 });
@@ -389,7 +552,7 @@
                 const currentValue = totalShares * this.currentPrice;
                 const totalAssets = this.remainingCapital + currentValue;
                 const totalReturn = totalAssets - this.originalCapital;
-                
+
                 // 修改收益率计算方式：基于历史最大持仓金额计算
                 let returnPercent = 0;
                 if (this.maxHoldingValue > 0) {
@@ -398,7 +561,7 @@
                     // 如果没有持仓记录，使用原来的计算方式
                     returnPercent = (totalReturn / this.originalCapital) * 100;
                 }
-                
+
                 const totalPriceChange = ((this.currentPrice - 1) / 1) * 100;
 
                 const sellTrades = this.tradingLog.filter(log => log.type === 'SELL_PARTIAL');
@@ -428,7 +591,7 @@
             };
 
             const defaultDates = getDefaultDateRange();
-            
+
             const [formData, setFormData] = useState({
                 totalCapital: 100000,
                 buyAmountPerPoint: 1000,
@@ -452,15 +615,15 @@
             const useDebounce = (callback, delay) => {
                 const debounceRef = useRef(null);
                 const lastExecutionRef = useRef(0);
-                
+
                 return useCallback((...args) => {
                     const now = Date.now();
-                    
+
                     // 清除之前的定时器
                     if (debounceRef.current) {
                         clearTimeout(debounceRef.current);
                     }
-                    
+
                     // 如果距离上次执行不足300ms，延迟执行
                     if (now - lastExecutionRef.current < delay) {
                         debounceRef.current = setTimeout(() => {
@@ -498,29 +661,29 @@
                 try {
                     // 构造API请求URL
                     const apiUrl = `/api/fund_data?code=${formData.fundCode}&start_date=${formData.startDate || ''}&end_date=${formData.endDate || ''}`;
-                    
+
                     console.log('正在请求API:', apiUrl);
-                    
+
                     const response = await fetch(apiUrl);
                     const result = await response.json();
-                    
+
                     if (!result.success) {
                         throw new Error(result.error || '获取数据失败');
                     }
-                    
+
                     const fundDataFromAPI = result.data;
-                    
+
                     if (!fundDataFromAPI || fundDataFromAPI.length === 0) {
                         throw new Error('没有获取到有效数据');
                     }
-                    
+
                     setFundData(fundDataFromAPI);
-                    
+
                     console.log(`获取到 ${fundDataFromAPI.length} 条基金数据，第一条日期: ${fundDataFromAPI[0]?.date}`);
-                    
+
                     // 自动运行模拟
                     await runSimulationWithData(formData, fundDataFromAPI);
-                    
+
                 } catch (error) {
                     console.error('获取基金数据失败:', error);
                     alert(`错误信息: ${error.message}`);
@@ -536,7 +699,7 @@
                     [name]: Number(value)
                 };
                 setFormData(newFormData);
-                
+
                 // 显示即将计算的状态
                 setIsAutoCalculating(true);
                 // 自动触发计算（防抖），传递最新的formData
@@ -588,7 +751,7 @@
                     try {
                         // 使用传入的fundData或当前的fundData
                         const currentFundData = customFundData || fundData;
-                        
+
                         if (!currentFundData || currentFundData.length === 0) {
                             alert('请先获取基金数据');
                             setLoading(false);
@@ -658,7 +821,7 @@
 
                     const ctx = chartRef.current?.getContext('2d');
                     if (!ctx) return;
-                    
+
                     // 销毁之前的图表实例
                     if (chartInstance.current) {
                         chartInstance.current.destroy();
@@ -676,7 +839,7 @@
                         }
                         return day.date;
                     });
-                    
+
                     // 处理买入卖出标记点
                     const cumulativeChangeData = data.dailyResults.map(day => day.cumulativeChange);
                     const pointStyles = data.dailyResults.map(day => {
@@ -704,7 +867,7 @@
                             hoverRadius: 6
                         };
                     });
-                    
+
                     chartInstance.current = new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -757,7 +920,7 @@
                                 },
                                 tooltip: {
                                     callbacks: {
-                                        afterLabel: function(context) {
+                                        afterLabel: function (context) {
                                             if (context.datasetIndex === 0) { // 只在累计涨跌线上显示交易信息
                                                 const dayData = data.dailyResults[context.dataIndex];
                                                 if (dayData.tradeInfo) {
@@ -817,7 +980,7 @@
                     <div className="container mx-auto p-6 max-w-full">
                         {/* 标题栏和设置按钮 */}
                         <div className="flex justify-between items-center mb-6">
-                            
+
                             <h1 className="text-3xl font-bold text-gray-800"><span className="inline-block origin-center rotate-180">J</span><span>J</span> Simulator</h1>
                             <button
                                 onClick={() => setShowSettings(true)}
@@ -838,9 +1001,11 @@
                                     <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟参数</h2>
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                基金编号 <span className="text-xs text-gray-500">（6位代码）</span>
-                                            </label>
+                                            <Tooltip content={TOOLTIPS.fundCode}>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                    基金编号 <span className="text-xs text-gray-500">（6位代码）</span>
+                                                </label>
+                                            </Tooltip>
                                             <input
                                                 type="text"
                                                 name="fundCode"
@@ -853,28 +1018,32 @@
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                    开始日期
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="startDate"
-                                                value={formData.startDate || ''}
+                                            <div>
+                                                <Tooltip content={TOOLTIPS.startDate}>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                        开始日期
+                                                    </label>
+                                                </Tooltip>
+                                                <input
+                                                    type="text"
+                                                    name="startDate"
+                                                    value={formData.startDate || ''}
                                                     onChange={handleBasicInfoChange}
                                                     onKeyDown={handleKeyDown}
                                                     placeholder="20230101"
                                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
-                                        </div>
-                                        <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                    结束日期
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="endDate"
-                                                value={formData.endDate || ''}
+                                                />
+                                            </div>
+                                            <div>
+                                                <Tooltip content={TOOLTIPS.endDate}>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                        结束日期
+                                                    </label>
+                                                </Tooltip>
+                                                <input
+                                                    type="text"
+                                                    name="endDate"
+                                                    value={formData.endDate || ''}
                                                     onChange={handleBasicInfoChange}
                                                     onKeyDown={handleKeyDown}
                                                     placeholder="20231231"
@@ -892,12 +1061,12 @@
                                                         const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
                                                         const endDate = today.toISOString().slice(0, 10).replace(/-/g, '');
                                                         const startDate = oneMonthAgo.toISOString().slice(0, 10).replace(/-/g, '');
-                                                    setFormData({
-                                                        ...formData,
+                                                        setFormData({
+                                                            ...formData,
                                                             startDate,
                                                             endDate
-                                                    });
-                                                }}
+                                                        });
+                                                    }}
                                                     className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                                                 >
                                                     1个月
@@ -980,66 +1149,76 @@
                                                 {loading ? '获取数据中...' : '获取基金数据'}
                                             </button>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="买入时，当前跌幅达到最小买入跌幅时买入">
-                                                    总额
-                                            </label>
-                                            <input
-                                                type="number"
-                                                name="totalCapital"
-                                                value={formData.totalCapital}
-                                                onChange={handleInputChange}
+                                            <div>
+                                                <Tooltip content={TOOLTIPS.totalCapital}>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                        总额
+                                                    </label>
+                                                </Tooltip>
+                                                <input
+                                                    type="number"
+                                                    name="totalCapital"
+                                                    value={formData.totalCapital}
+                                                    onChange={handleInputChange}
                                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
-                                        </div>
-                                        <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="买入时，当前跌幅达到最小买入跌幅时买入">
-                                                    每份额买入额
-                                            </label>
-                                            <input
-                                                type="number"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Tooltip content={TOOLTIPS.buyAmountPerPoint}>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                        每份额买入额
+                                                    </label>
+                                                </Tooltip>
+                                                <input
+                                                    type="number"
                                                     name="buyAmountPerPoint"
                                                     value={formData.buyAmountPerPoint}
-                                                onChange={handleInputChange}
+                                                    onChange={handleInputChange}
                                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
+                                                />
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="买入时，当前跌幅达到最小买入跌幅时买入">
-                                                    最小买入跌幅 (%)
-                                            </label>
-                                            <input
-                                                type="number"
+                                            <div>
+                                                <Tooltip content={TOOLTIPS.minBuyDropPercent} showIcon={true}>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                        最小买入跌幅 (%)
+                                                    </label>
+                                                </Tooltip>
+                                                <input
+                                                    type="number"
                                                     step="0.1"
                                                     name="minBuyDropPercent"
                                                     value={formData.minBuyDropPercent}
-                                                onChange={handleInputChange}
+                                                    onChange={handleInputChange}
                                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
-                                        </div>
-                                        <div>
-                                                <label className="block text-xs font-medium text-gray-700 mb-1" title="卖出时，当前持仓额达到总资产的百分比">
-                                                    卖出阈值 (%)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                name="sellThreshold"
-                                                value={formData.sellThreshold}
-                                                onChange={handleInputChange}
+                                                />
+                                            </div>
+                                            <div>
+                                                <Tooltip content={TOOLTIPS.sellThreshold} showIcon={true}>
+                                                    <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                        卖出阈值 (%)
+                                                    </label>
+                                                </Tooltip>
+                                                <input
+                                                    type="number"
+                                                    name="sellThreshold"
+                                                    value={formData.sellThreshold}
+                                                    onChange={handleInputChange}
                                                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
+                                                />
                                             </div>
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1" title="卖出时，当前持仓额达到总资产的百分比">
-                                                卖出比例 (%)
-                                            </label>
+                                            <Tooltip content={TOOLTIPS.sellRatio}>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                    卖出比例 (%)
+                                                </label>
+                                            </Tooltip>
                                             <input
                                                 type="number"
                                                 name="sellRatio"
@@ -1050,50 +1229,52 @@
                                         </div>
 
                                         <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                份额计算方式
-                                            </label>
+                                            <Tooltip content={TOOLTIPS.useRounding} showIcon={true}>
+                                                <label className="block text-xs font-medium text-gray-700 mb-1 cursor-help">
+                                                    份额计算方式
+                                                </label>
+                                            </Tooltip>
                                             <div className="space-y-1">
-                                                        <label className="flex items-center">
-                                                            <input
-                                                                type="radio"
-                                                                name="useRounding"
-                                                                value="true"
-                                                                checked={formData.useRounding === true}
-                                                                onChange={(e) => {
-                                                                    const newFormData = { ...formData, useRounding: e.target.value === 'true' };
-                                                                    setFormData(newFormData);
-                                                                    setIsAutoCalculating(true);
-                                                                    debouncedAutoCalculate(newFormData);
-                                                                }}
-                                                                className="mr-2"
-                                                            />
-                                                            <span className="text-xs mr-2">四舍五入</span>
-                                                            <span className="text-xs text-gray-500">跌幅按最小跌幅四舍五入计算份额</span>
+                                                <label className="flex items-center">
+                                                    <input
+                                                        type="radio"
+                                                        name="useRounding"
+                                                        value="true"
+                                                        checked={formData.useRounding === true}
+                                                        onChange={(e) => {
+                                                            const newFormData = { ...formData, useRounding: e.target.value === 'true' };
+                                                            setFormData(newFormData);
+                                                            setIsAutoCalculating(true);
+                                                            debouncedAutoCalculate(newFormData);
+                                                        }}
+                                                        className="mr-2"
+                                                    />
+                                                    <span className="text-xs mr-2">四舍五入</span>
+                                                    <span className="text-xs text-gray-500">跌幅按最小跌幅四舍五入计算份额</span>
 
-                                                        </label>
-                                                        <label className="flex items-center">
-                                                            <input
-                                                                type="radio"
-                                                                name="useRounding"
-                                                                value="false"
-                                                                checked={formData.useRounding === false}
-                                                                onChange={(e) => {
-                                                                    const newFormData = { ...formData, useRounding: e.target.value === 'true' };
-                                                                    setFormData(newFormData);
-                                                                    setIsAutoCalculating(true);
-                                                                    debouncedAutoCalculate(newFormData);
-                                                                }}
-                                                                className="mr-2"
-                                                            />
-                                                            <span className="text-xs mr-2">向下取整</span>
-                                                            <span className="text-xs text-gray-500">跌幅按大于等于最小跌幅计算份额</span>
+                                                </label>
+                                                <label className="flex items-center">
+                                                    <input
+                                                        type="radio"
+                                                        name="useRounding"
+                                                        value="false"
+                                                        checked={formData.useRounding === false}
+                                                        onChange={(e) => {
+                                                            const newFormData = { ...formData, useRounding: e.target.value === 'true' };
+                                                            setFormData(newFormData);
+                                                            setIsAutoCalculating(true);
+                                                            debouncedAutoCalculate(newFormData);
+                                                        }}
+                                                        className="mr-2"
+                                                    />
+                                                    <span className="text-xs mr-2">向下取整</span>
+                                                    <span className="text-xs text-gray-500">跌幅按大于等于最小跌幅计算份额</span>
 
-                                                        </label>
+                                                </label>
                                             </div>
                                         </div>
 
-                                      
+
 
                                         <div>
                                             <button
@@ -1124,40 +1305,52 @@
                                         <div className="summary-section bg-white rounded-lg shadow-md p-6 mb-6">
                                             <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                                                 <div className="text-center">
+                                                    <div className="text-2xl font-bold text-orange-600">
+                                                        {results.maxHoldingValue ? results.maxHoldingValue.toFixed(0) : '0'}
+                                                    </div>
+                                                    <Tooltip content={TOOLTIPS.maxHoldingValue}>
+                                                        <div className="text-sm text-gray-600 cursor-help">最大持仓额</div>
+                                                    </Tooltip>
+                                                </div>
+                                                <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getProfitColor(results.returnPercent)}`}>
                                                         {results.returnPercent.toFixed(2)}%
                                                     </div>
-                                                    <div className="text-sm text-gray-600" title="基于最大持仓计算收益率">模拟收益率</div>
+                                                    <Tooltip content={TOOLTIPS.returnPercent}>
+                                                        <div className="text-sm text-gray-600 cursor-help">模拟收益率</div>
+                                                    </Tooltip>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getProfitColor(results.totalReturn)}`}>
                                                         {results.totalReturn.toFixed(0)}
                                                     </div>
-                                                    <div className="text-sm text-gray-600">总盈亏额</div>
-                                                </div>
-                                                <div className="text-center">
-                                                    <div className="text-2xl font-bold text-orange-600">
-                                                        {results.maxHoldingValue ? results.maxHoldingValue.toFixed(0) : '0'}
-                                                    </div>
-                                                    <div className="text-sm text-gray-600">最大持仓额</div>
+                                                    <Tooltip content={TOOLTIPS.totalReturn}>
+                                                        <div className="text-sm text-gray-600 cursor-help">总盈亏额</div>
+                                                    </Tooltip>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className="text-2xl font-bold text-blue-600">
                                                         {results.dailyResults.length}天
                                                     </div>
-                                                    <div className="text-sm text-gray-600">交易日数</div>
+                                                    <Tooltip content={TOOLTIPS.tradingDays}>
+                                                        <div className="text-sm text-gray-600 cursor-help">交易日数</div>
+                                                    </Tooltip>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className={`text-2xl font-bold ${getChangeColor(results.totalPriceChange)}`}>
                                                         {results.totalPriceChange.toFixed(2)}%
                                                     </div>
-                                                    <div className="text-sm text-gray-600">区间涨跌幅</div>
+                                                    <Tooltip content={TOOLTIPS.totalPriceChange}>
+                                                        <div className="text-sm text-gray-600 cursor-help">区间涨跌幅</div>
+                                                    </Tooltip>
                                                 </div>
                                                 <div className="text-center">
                                                     <div className="text-2xl font-bold text-purple-600">
                                                         {results.buyCount}/{results.sellCount}
                                                     </div>
-                                                    <div className="text-sm text-gray-600">买入/卖出次数</div>
+                                                    <Tooltip content={`${TOOLTIPS.buyCount} / ${TOOLTIPS.sellCount}`}>
+                                                        <div className="text-sm text-gray-600 cursor-help">买入/卖出次数</div>
+                                                    </Tooltip>
                                                 </div>
                                             </div>
                                         </div>
@@ -1169,21 +1362,19 @@
                                                 <div className="flex space-x-2">
                                                     <button
                                                         onClick={() => setViewMode('table')}
-                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                                                            viewMode === 'table' 
-                                                                ? 'bg-blue-600 text-white' 
+                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'table'
+                                                                ? 'bg-blue-600 text-white'
                                                                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         表格
                                                     </button>
                                                     <button
                                                         onClick={() => setViewMode('chart')}
-                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                                                            viewMode === 'chart' 
-                                                                ? 'bg-blue-600 text-white' 
+                                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'chart'
+                                                                ? 'bg-blue-600 text-white'
                                                                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         图表
                                                     </button>
@@ -1203,50 +1394,79 @@
                                                 ) : (
                                                     <div className="sticky-table">
                                                         <table className="min-w-full table-auto compact-table">
-                                                        <thead>
-                                                            <tr className="bg-gray-50">
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">当日涨跌</th>
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">累计涨跌</th>
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓涨幅</th>
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">持仓额</th>
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总资产</th>
-                                                                <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">交易信息</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="bg-white divide-y divide-gray-200">
-                                                            {results.dailyResults.map((day, index) => (
-                                                                <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                        {day.date}
-                                                                    </td>
-                                                                    <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
-                                                                        {day.changePercent > 0 ? '+' : ''}{day.changePercent.toFixed(2)}%
-                                                                    </td>
-                                                                    <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.cumulativeChange)}`}>
-                                                                        {day.cumulativeChange > 0 ? '+' : ''}{day.cumulativeChange.toFixed(2)}%
-                                                                    </td>
-                                                                    <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
-                                                                        {day.currentGainPercent > 0 ? '+' : ''}{day.currentGainPercent.toFixed(2)}%
-                                                                    </td>
-                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                        {day.holdingValue.toFixed(0)}
-                                                                        <span
-                                                                            className="text-xs"
-                                                                            dangerouslySetInnerHTML={{ __html: day.holdingValueDetail }}
-                                                                        />
-                                                                    </td>
-                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
-                                                                        {day.totalAssets.toFixed(0)}
-                                                                    </td>
-                                                                    <td className="px-2 py-1 whitespace-nowrap text-sm text-blue-600">
-                                                                        {day.tradeInfo || '-'}
-                                                                    </td>
+                                                            <thead>
+                                                                <tr className="bg-gray-50">
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-help">
+                                                                        <Tooltip content={TOOLTIPS.dailyChange}>
+                                                                            当日涨跌
+                                                                        </Tooltip>
+                                                                    </th>
+
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-help">
+                                                                        <Tooltip content={TOOLTIPS.cumulativeChange}>
+                                                                            累计涨跌
+                                                                        </Tooltip>
+                                                                    </th>
+
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-help">
+                                                                        <Tooltip content={TOOLTIPS.holdingGain}>
+                                                                            持仓涨幅
+                                                                        </Tooltip>
+                                                                    </th>
+
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-help">
+                                                                        <Tooltip content={TOOLTIPS.holdingValue}>
+                                                                            持仓额
+                                                                        </Tooltip>
+                                                                    </th>
+
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-help">
+                                                                        <Tooltip content={TOOLTIPS.totalAssets}>
+                                                                            总资产
+                                                                        </Tooltip>
+                                                                    </th>
+
+                                                                    <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-help">
+                                                                        <Tooltip content={TOOLTIPS.tradeInfo}>
+                                                                            交易信息
+                                                                        </Tooltip>
+                                                                    </th>
                                                                 </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
+                                                            </thead>
+                                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                                {results.dailyResults.map((day, index) => (
+                                                                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                                                        <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                            {day.date}
+                                                                        </td>
+                                                                        <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
+                                                                            {day.changePercent > 0 ? '+' : ''}{day.changePercent.toFixed(2)}%
+                                                                        </td>
+                                                                        <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.cumulativeChange)}`}>
+                                                                            {day.cumulativeChange > 0 ? '+' : ''}{day.cumulativeChange.toFixed(2)}%
+                                                                        </td>
+                                                                        <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.currentGainPercent)}`}>
+                                                                            {day.currentGainPercent > 0 ? '+' : ''}{day.currentGainPercent.toFixed(2)}%
+                                                                        </td>
+                                                                        <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                            {day.holdingValue.toFixed(0)}
+                                                                            <span
+                                                                                className="text-xs"
+                                                                                dangerouslySetInnerHTML={{ __html: day.holdingValueDetail }}
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">
+                                                                            {day.totalAssets.toFixed(0)}
+                                                                        </td>
+                                                                        <td className="px-2 py-1 whitespace-nowrap text-sm text-blue-600">
+                                                                            {day.tradeInfo || '-'}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 )
                                             ) : (
                                                 <div className="chart-container">
@@ -1342,7 +1562,7 @@
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* 使用提示 */}
                         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <div className="flex items-start">
