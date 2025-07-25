@@ -337,15 +337,63 @@ def health_check():
 def jj_page():
     """JJ Simulator页面入口"""
     try:
-        # 获取当前脚本所在目录
+        # 获取项目根目录
         current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)  # 上一级目录
+        dist_dir = os.path.join(project_root, 'frontend', 'dist')
+
+        # 检查dist目录是否存在
+        if not os.path.exists(dist_dir):
+            return jsonify({
+                'success': False,
+                'error': '前端构建文件不存在，请先运行 cd frontend && npm run build'
+            }), 404
+
         # 发送index.html文件
-        return send_from_directory(current_dir, '../frontend/dist/index.html')
+        return send_from_directory(dist_dir, 'index.html')
     except Exception as e:
         return jsonify({
             'success': False,
             'error': f'页面加载失败: {str(e)}'
         }), 500
+
+@app.route('/assets/<path:filename>')
+def serve_assets(filename):
+    """提供前端静态资源文件"""
+    try:
+        # 获取项目根目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        assets_dir = os.path.join(project_root, 'frontend', 'dist', 'assets')
+
+        return send_from_directory(assets_dir, filename)
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'静态资源加载失败: {str(e)}'
+        }), 404
+
+@app.route('/<path:filename>')
+def serve_static_files(filename):
+    """提供其他静态文件（如vite.svg等）"""
+    try:
+        # 获取项目根目录
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        dist_dir = os.path.join(project_root, 'frontend', 'dist')
+
+        # 检查文件是否存在
+        file_path = os.path.join(dist_dir, filename)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return send_from_directory(dist_dir, filename)
+        else:
+            # 如果文件不存在，返回index.html（用于SPA路由）
+            return send_from_directory(dist_dir, 'index.html')
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'文件加载失败: {str(e)}'
+        }), 404
 
 if __name__ == '__main__':
     print("启动基金数据API服务...")
