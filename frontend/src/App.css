@@ -1,0 +1,27 @@
+@layer theme, base, antd, components, utilities;
+
+@import 'tailwindcss';
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
+
+  .anim_btn {
+    -webkit-tap-highlight-color: transparent;
+    @apply active:scale-90 transition cursor-pointer;
+  }
+
+  .flex_center {
+    @apply flex justify-center items-center;
+  }
+}

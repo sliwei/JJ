@@ -1,0 +1,201 @@
+/* 固定表头样式 */
+.sticky-table {
+  position: relative;
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+}
+
+.sticky-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #f9fafb;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* 缩小表格间距 */
+.compact-table td,
+.compact-table th {
+  padding: 0.25rem 0.5rem !important;
+}
+
+/* 确保滚动条样式 */
+.sticky-table::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sticky-table::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.sticky-table::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.sticky-table::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 固定页面高度样式 */
+.fixed-height-container {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.content-area {
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
+.left-panel {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.right-panel {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.results-area {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-section {
+  flex-shrink: 0;
+}
+
+.table-section {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-section .sticky-table {
+  flex: 1;
+  max-height: none;
+}
+
+.chart-container {
+  flex: 1;
+  min-height: 400px;
+}
+
+/* 设置弹窗样式 */
+.settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-content {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+/* 动态盈亏颜色类 */
+.profit-color {
+  color: var(--profit-color);
+}
+
+.loss-color {
+  color: var(--loss-color);
+}
+
+/* Tooltip 样式 */
+.tooltip-container {
+  display: inline-block;
+}
+
+.tooltip-content {
+  position: fixed;
+  background-color: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s,
+    visibility 0.15s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: 300px;
+  white-space: normal;
+  pointer-events: none;
+}
+
+/* 基金搜索下拉框样式 */
+.fund-dropdown {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  background-color: var(--dropdown-bg);
+  border: 1px solid var(--dropdown-border);
+}
+
+.fund-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fund-dropdown::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.fund-dropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.fund-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* 下拉框头部样式 */
+.dropdown-header {
+  background-color: var(--dropdown-header-bg);
+  color: var(--dropdown-header-text);
+  border-color: var(--dropdown-border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* 下拉框项目样式 */
+.dropdown-item {
+  background-color: var(--dropdown-bg);
+  color: var(--dropdown-item-text);
+  border-color: var(--dropdown-item-border);
+}
+
+.dropdown-item:hover {
+  background-color: var(--dropdown-item-hover);
+}
+
+.dropdown-item-subtext {
+  color: var(--dropdown-item-subtext);
+}
