@@ -18,9 +18,9 @@ export default defineConfig(({ mode, command }) => {
 
   const isProd = process.env.VITE_APP_ENV && process.env.VITE_APP_ENV !== 'dev'
   const plugins = [react(), tailwindcss()]
-  let base = '/'
-  if (isProd) {
-  }
+  const base = '/'
+  // if (isProd) {
+  // }
   return {
     // 部署生产环境和开发环境下的URL。
     // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
@@ -53,10 +53,10 @@ export default defineConfig(({ mode, command }) => {
       // 调整开发环境 sourcemap 配置
       sourcemap: 'inline', // 更快的 sourcemap 生成方式
       proxy: {
-        '^/api': {
-          target: 'https://api.test.cn',
+        '^/core_api': {
+          target: 'http://localhost:8080',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/maliang_api/, '')
+          rewrite: (path) => path.replace(/^\/core_api/, '')
         }
       }
     }

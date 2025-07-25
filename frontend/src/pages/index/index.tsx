@@ -1,65 +1,51 @@
 import './index.css'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import Tooltip, { TOOLTIPS } from '@/components/Tooltip'
-import TrendChart from '@/components/TrendChart'
+import useObjAtom from '@/hooks/useObjAtom'
+import { colorModeState } from '@/store/global'
 import StockTradingSimulator, { DailyResult, FinalResult, FundData } from '@/utils/stockTradingSimulator'
 
+import Code from './components/Code/indx'
+import Settings from './components/Settings'
 import SimulationParams from './components/SimulationParams/indx'
+import TrendChart from './components/TrendChart'
 
 // 定义表单数据类型
-interface FormData {
+export interface FormData {
   totalCapital: number
   buyAmountPerPoint: number
   minBuyDropPercent: number
-  useRounding: boolean
+  useRounding: number
   sellThreshold: number
   sellRatio: number
-  startDate: string
-  endDate: string
 }
-
-// 定义颜色模式类型
-type ColorMode = 'standard' | 'reversed'
 
 // 定义视图模式类型
 type ViewMode = 'table' | 'chart'
 
 export function Component() {
-  // 计算默认的1年日期范围
-  const getDefaultDateRange = () => {
-    const today = new Date()
-    const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
-    const endDate = today.toISOString().slice(0, 10).replace(/-/g, '')
-    const startDate = oneYearAgo.toISOString().slice(0, 10).replace(/-/g, '')
-    return { startDate, endDate }
-  }
-
-  const defaultDates = getDefaultDateRange()
-
   const [formData, setFormData] = useState<FormData>({
     totalCapital: 100000,
     buyAmountPerPoint: 1000,
-    minBuyDropPercent: 1.0,
-    useRounding: true,
+    minBuyDropPercent: 0.5,
+    useRounding: 1,
     sellThreshold: 5,
-    sellRatio: 50,
-    startDate: defaultDates.startDate,
-    endDate: defaultDates.endDate
+    sellRatio: 50
   })
-
-  const [results, setResults] = useState<FinalResult | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
+  const [results, setResults] = useState<FinalResult | null>(null)
   const [fundData, setFundData] = useState<FundData[] | null>(null)
-  const [colorMode, setColorMode] = useState<ColorMode>('reversed') // 'standard' 或 'reversed'
-  const [showSettings, setShowSettings] = useState<boolean>(false) // 控制设置弹窗显示
   const [viewMode, setViewMode] = useState<ViewMode>('table') // 'table' 或 'chart'
   const [isAutoCalculating, setIsAutoCalculating] = useState<boolean>(false) // 自动计算状态
+  const colorMode = useObjAtom(colorModeState)
 
   // 防抖的自动计算函数 - 接受最新的formData参数
   const debouncedAutoCalculateRef = useRef<NodeJS.Timeout | null>(null)
 
+  // 运行模拟的函数，接受自定义的formData和fundData
   const runSimulationWithData = useCallback(
     (customFormData: FormData | null, customFundData: FundData[] | null): Promise<FinalResult> => {
       return new Promise((resolve, reject) => {
@@ -69,12 +55,11 @@ export function Component() {
           const currentFundData = customFundData || fundData
 
           if (!currentFundData || currentFundData.length === 0) {
-            alert('请先获取基金数据')
+            toast.warning('请先获取基金数据')
             setLoading(false)
             reject(new Error('无效数据'))
             return
           }
-
           // 使用传入的formData或当前的formData
           const currentFormData = customFormData || formData
 
@@ -82,7 +67,7 @@ export function Component() {
             currentFormData.totalCapital,
             currentFormData.buyAmountPerPoint,
             currentFormData.minBuyDropPercent,
-            currentFormData.useRounding,
+            !!currentFormData.useRounding,
             currentFormData.sellThreshold,
             currentFormData.sellRatio
           )
@@ -92,7 +77,7 @@ export function Component() {
           resolve(result)
         } catch (error) {
           console.error('模拟运行失败:', error)
-          alert('模拟运行失败，请检查参数设置')
+          toast.warning('模拟运行失败，请检查参数设置')
           reject(error)
         } finally {
           setLoading(false)
@@ -132,71 +117,21 @@ export function Component() {
     setFormData(newFormData)
 
     // 显示即将计算的状态
-    setIsAutoCalculating(true)
+    // setIsAutoCalculating(true)
     // 自动触发计算（防抖），传递最新的formData
-    debouncedAutoCalculate(newFormData)
-  }
-
-  // 处理基金编号和日期字段的变化，不触发自动计算
-  const handleBasicInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData({
-      ...formData,
-      [name]: value
-    })
+    // debouncedAutoCalculate(newFormData)
   }
 
   // 获取盈亏颜色类名
   const getProfitColor = (value: number): string => {
     if (value === 0) return 'text-gray-600'
 
-    if (colorMode === 'standard') {
+    if (colorMode.val === 'standard') {
       return value > 0 ? 'text-green-600' : 'text-red-600'
     } else {
       return value > 0 ? 'text-red-600' : 'text-green-600'
     }
   }
-
-  // 获取涨跌颜色类名
-  const getChangeColor = (value: number): string => {
-    if (value === 0) return 'text-gray-600'
-
-    if (colorMode === 'standard') {
-      return value > 0 ? 'text-green-600' : 'text-red-600'
-    } else {
-      return value > 0 ? 'text-red-600' : 'text-green-600'
-    }
-  }
-
-  // 设置CSS变量
-  useEffect(() => {
-    const root = document.documentElement
-    if (colorMode === 'standard') {
-      root.style.setProperty('--profit-color', '#16a34a') // green-600
-      root.style.setProperty('--loss-color', '#dc2626') // red-600
-      // 下拉列表主题色
-      root.style.setProperty('--dropdown-bg', '#ffffff') // 白色背景
-      root.style.setProperty('--dropdown-border', '#d1d1d1') // gray-400 - 更明显的边框
-      root.style.setProperty('--dropdown-header-bg', '#f9fafb') // gray-50
-      root.style.setProperty('--dropdown-header-text', '#6b7280') // gray-500
-      root.style.setProperty('--dropdown-item-text', '#111827') // gray-900
-      root.style.setProperty('--dropdown-item-subtext', '#6b7280') // gray-500
-      root.style.setProperty('--dropdown-item-hover', '#f3f4f6') // gray-100
-      root.style.setProperty('--dropdown-item-border', '#e5e7eb') // gray-200 - 更明显的分割线
-    } else {
-      root.style.setProperty('--profit-color', '#dc2626') // red-600
-      root.style.setProperty('--loss-color', '#16a34a') // green-600
-      // 下拉列表主题色（翻转模式保持一致的UI颜色）
-      root.style.setProperty('--dropdown-bg', '#ffffff') // 白色背景
-      root.style.setProperty('--dropdown-border', '#d1d1d1') // gray-400 - 更明显的边框
-      root.style.setProperty('--dropdown-header-bg', '#f9fafb') // gray-50
-      root.style.setProperty('--dropdown-header-text', '#6b7280') // gray-500
-      root.style.setProperty('--dropdown-item-text', '#111827') // gray-900
-      root.style.setProperty('--dropdown-item-subtext', '#6b7280') // gray-500
-      root.style.setProperty('--dropdown-item-hover', '#f3f4f6') // gray-100
-      root.style.setProperty('--dropdown-item-border', '#e5e7eb') // gray-200 - 更明显的分割线
-    }
-  }, [colorMode])
 
   return (
     <div className="fixed-height-container bg-gray-100 min-h-screen">
@@ -207,39 +142,27 @@ export function Component() {
             <span className="inline-block origin-center rotate-180">J</span>
             <span>J</span> Simulator
           </h1>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>设置</span>
-          </button>
+          <Settings />
         </div>
 
         <div className="content-area flex flex-col lg:flex-row gap-6">
           {/* 左侧：参数设置区域 */}
           <div className="lg:w-1/3 left-panel">
-            <SimulationParams
-              formData={formData}
-              setFormData={setFormData}
-              loading={loading}
-              setLoading={setLoading}
-              handleInputChange={handleInputChange}
-              handleBasicInfoChange={handleBasicInfoChange}
-              isAutoCalculating={isAutoCalculating}
-              getChangeColor={getChangeColor}
-              runSimulationWithData={runSimulationWithData}
-              fundData={fundData}
-              setFundData={setFundData}
-            />
+            <div className="bg-white rounded-lg shadow-md p-6 h-full">
+              <h2 className="text-xl font-semibold mb-4 text-gray-700">模拟参数</h2>
+              <div className="space-y-3">
+                <Code getProfitColor={getProfitColor} runSimulationWithData={runSimulationWithData} setFundData={setFundData} />
+                <SimulationParams
+                  formData={formData}
+                  loading={loading}
+                  setLoading={setLoading}
+                  handleInputChange={handleInputChange}
+                  isAutoCalculating={isAutoCalculating}
+                  runSimulationWithData={runSimulationWithData}
+                  fundData={fundData}
+                />
+              </div>
+            </div>
           </div>
 
           {/* 右侧：结果展示区域 */}
@@ -278,7 +201,7 @@ export function Component() {
                       </Tooltip>
                     </div>
                     <div className="text-center">
-                      <div className={`text-2xl font-bold ${getChangeColor(results.totalPriceChange)}`}>
+                      <div className={`text-2xl font-bold ${getProfitColor(results.totalPriceChange)}`}>
                         {results.totalPriceChange.toFixed(2)}%
                       </div>
                       <Tooltip content={TOOLTIPS.totalPriceChange}>
@@ -374,11 +297,11 @@ export function Component() {
                             {results.dailyResults.map((day: DailyResult, index: number) => (
                               <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                 <td className="px-2 py-1 whitespace-nowrap text-sm text-gray-900">{day.date}</td>
-                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.changePercent)}`}>
+                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.changePercent)}`}>
                                   {day.changePercent > 0 ? '+' : ''}
                                   {day.changePercent.toFixed(2)}%
                                 </td>
-                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getChangeColor(day.cumulativeChange)}`}>
+                                <td className={`px-2 py-1 whitespace-nowrap text-sm font-medium ${getProfitColor(day.cumulativeChange)}`}>
                                   {day.cumulativeChange > 0 ? '+' : ''}
                                   {day.cumulativeChange.toFixed(2)}%
                                 </td>
@@ -446,84 +369,6 @@ export function Component() {
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* 设置弹窗 */}
-        {showSettings && (
-          <div className="settings-modal" onClick={() => setShowSettings(false)}>
-            <div className="settings-content" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-700">页面设置</h3>
-                <button onClick={() => setShowSettings(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">颜色模式:</label>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="colorMode"
-                      value="standard"
-                      checked={colorMode === 'standard'}
-                      onChange={(e) => setColorMode(e.target.value as ColorMode)}
-                      className="mr-3"
-                    />
-                    <span className="text-sm mr-2">标准模式</span>
-                    <span className="text-xs text-green-500 mr-2">+1</span>
-                    <span className="text-xs text-red-500">-1</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="colorMode"
-                      value="reversed"
-                      checked={colorMode === 'reversed'}
-                      onChange={(e) => setColorMode(e.target.value as ColorMode)}
-                      className="mr-3"
-                    />
-                    <span className="text-sm mr-2">翻转模式</span>
-                    <span className="text-xs text-red-500 mr-2">+1</span>
-                    <span className="text-xs text-green-500">-1</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 使用提示 */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div>
-              <h4 className="text-sm font-medium text-blue-800 mb-2">使用说明</h4>
-              <ul className="text-xs text-blue-700 space-y-1">
-                <li>• 支持基金代码或名称搜索（如：输入"000001"或"华夏成长"）</li>
-                <li>• 输入时会自动显示匹配的基金列表供选择</li>
-                <li>• 点击⭐图标可收藏常用基金，输入框为空时显示收藏列表</li>
-                <li>• 日期格式为YYYYMMDD（如：20230101）</li>
-                <li>• 需要启动后端API服务获取真实数据</li>
-                <li>
-                  • 启动命令：<code className="bg-blue-100 px-1 rounded">python fund_api.py</code>
-                </li>
-                <li>
-                  • API地址：<code className="bg-blue-100 px-1 rounded">http://localhost:8080</code>
-                </li>
-              </ul>
-            </div>
           </div>
         </div>
       </div>

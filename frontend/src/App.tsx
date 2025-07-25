@@ -1,6 +1,7 @@
 import './App.css'
 
 import { useEffect } from 'react'
+import { Toaster } from 'sonner'
 
 import { AnimatedRoutes } from '@/router'
 
@@ -14,6 +15,7 @@ function App() {
   return (
     <>
       <AnimatedRoutes />
+      <Toaster position="top-center" />
     </>
   )
 }

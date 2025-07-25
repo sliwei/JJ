@@ -1,15 +1,15 @@
-import { message } from 'antd'
 import type { AxiosInstance } from 'axios'
 import axios from 'axios'
+import { toast } from 'sonner'
 
 import { router } from '@/router'
 
-import { clearLoginInfo, headerInfo } from './tool'
+import { clearLoginInfo } from './tool'
 
 export interface Res<T = unknown> {
-  code: 0 | 1 | 200 | 577 | 578
   data: T
-  msg: string
+  success: boolean
+  error?: string
 }
 
 const service: AxiosInstance = axios.create({
@@ -22,10 +22,6 @@ service.interceptors.request.use(
   (config) => {
     const { headers } = config
     if (headers) {
-      headers['deviceId'] = headerInfo.deviceId
-      headers['deviceType'] = headerInfo.deviceType
-      headers['appVersion'] = headerInfo.appVersion
-      headers['deviceBrowser'] = headerInfo.deviceBrowser
       if (localStorage.token) {
         headers['Authorization'] = localStorage.token.includes('Bearer') ? localStorage.token : `Bearer ${localStorage.token}`
       }
@@ -52,7 +48,7 @@ service.interceptors.response.use(
   (error) => {
     console.log(error?.response)
     if (error?.response?.status === 401 || error?.response?.status === 403) {
-      message.error(error?.response?.data?.msg || '登录超时，请重新登录！')
+      toast.error('登录已过期，请重新登录')
       clearLoginInfo()
       if (router.state.location.pathname !== '/') {
         router.navigate(`/`, {
@@ -63,9 +59,9 @@ service.interceptors.response.use(
       return Promise.reject(error.message)
     }
     if (error.message !== 'canceled') {
-      console.log(error?.response?.data?.msg || error.message)
+      console.log(error?.response?.data?.error || error.message)
     }
-    return Promise.reject(error?.response?.data?.msg || error.message)
+    return Promise.reject(error?.response?.data?.error || error.message)
   }
 )
 

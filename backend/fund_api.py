@@ -123,10 +123,12 @@ def get_fund_list():
         
         return jsonify({
             'success': True,
-            'data': result_funds,
-            'total_count': len(fund_list),
-            'returned_count': len(result_funds),
-            'cache_time': datetime.fromtimestamp(fund_list_cache['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+            'data': {
+                'funds': result_funds,
+                'total_count': len(fund_list),
+                'returned_count': len(result_funds),
+                'cache_time': datetime.fromtimestamp(fund_list_cache['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+            },
         })
         
     except Exception as e:
@@ -259,11 +261,13 @@ def get_fund_data():
         
         return jsonify({
             'success': True,
-            'data': result_data,
-            'fund_code': fund_code,
-            'start_date': start_date,
-            'end_date': end_date,
-            'count': len(result_data)
+            'data': {
+                'list': result_data,
+                'fund_code': fund_code,
+                'start_date': start_date,
+                'end_date': end_date,
+                'count': len(result_data)
+            }
         })
         
     except Exception as e:
@@ -336,7 +340,7 @@ def jj_page():
         # 获取当前脚本所在目录
         current_dir = os.path.dirname(os.path.abspath(__file__))
         # 发送index.html文件
-        return send_from_directory(current_dir, 'index.html')
+        return send_from_directory(current_dir, '../frontend/dist/index.html')
     except Exception as e:
         return jsonify({
             'success': False,
