@@ -14,6 +14,7 @@ import traceback
 import os
 import json
 import time
+import threading
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
@@ -21,9 +22,116 @@ CORS(app)  # 允许跨域请求
 # 基金列表缓存
 fund_list_cache = {
     'data': None,
-    'timestamp': 0,
-    'cache_duration': 3600  # 1小时缓存
+    'timestamp': 0
 }
+
+# 锁，用于线程安全
+cache_lock = threading.Lock()
+
+# 初始化标志，确保只初始化一次
+_initialized = False
+
+
+def init_fund_cache():
+    """
+    初始化基金缓存：立即抓取一次数据，并启动定时任务
+    """
+    global _initialized
+    if _initialized:
+        return
+    
+    _initialized = True
+    
+    # 启动时立即抓取一次数据
+    print("=" * 60)
+    print("🚀 初始化基金列表缓存...")
+    print("=" * 60)
+    success = fetch_fund_list()
+    if success:
+        print("✓ 基金列表缓存初始化完成")
+    else:
+        print("⚠ 基金列表缓存初始化失败，将在定时任务中重试")
+    
+    # 启动定时任务，每天0点自动抓取
+    schedule_daily_fetch()
+    print("✓ 已启动每日0点自动更新任务")
+    print("=" * 60)
+
+
+def fetch_fund_list():
+    """
+    抓取基金列表数据并更新缓存
+    """
+    try:
+        print("正在获取基金列表数据...")
+        # 使用fund_open_fund_daily_em获取开放式基金数据
+        fund_df = ak.fund_open_fund_daily_em()
+        
+        if fund_df.empty:
+            print("警告: 获取到的基金列表数据为空")
+            return False
+        
+        # 处理数据格式，提取需要的字段
+        fund_list = []
+        for _, row in fund_df.iterrows():
+            try:
+                fund_info = {
+                    'code': str(row.get('基金代码', '')),
+                    'name': str(row.get('基金简称', '')),
+                    'net_value': float(row.get('单位净值', 0)) if pd.notna(row.get('单位净值')) else 0,
+                    'daily_growth': float(row.get('日增长率', 0)) if pd.notna(row.get('日增长率')) else 0,
+                    'total_value': float(row.get('累计净值', 0)) if pd.notna(row.get('累计净值')) else 0
+                }
+                
+                # 过滤掉无效数据
+                if fund_info['code'] and fund_info['name']:
+                    fund_list.append(fund_info)
+            except Exception as e:
+                # 跳过有问题的数据行
+                continue
+        
+        # 线程安全地更新缓存
+        with cache_lock:
+            fund_list_cache['data'] = fund_list
+            fund_list_cache['timestamp'] = time.time()
+        
+        print(f"成功获取 {len(fund_list)} 只基金数据，缓存更新时间: {datetime.fromtimestamp(fund_list_cache['timestamp']).strftime('%Y-%m-%d %H:%M:%S')}")
+        return True
+        
+    except Exception as e:
+        print(f"获取基金列表失败: {e}")
+        print(traceback.format_exc())
+        return False
+
+
+def schedule_daily_fetch():
+    """
+    定时任务：计算到下一个0点的时间，然后设置定时器
+    """
+    now = datetime.now()
+    # 计算下一个0点的时间
+    next_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 如果当前时间已经过了今天的0点，下一个0点就是明天
+    if now >= next_midnight:
+        next_midnight = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 计算需要等待的秒数
+    seconds_until_midnight = (next_midnight - now).total_seconds()
+    
+    print(f"下次自动抓取时间: {next_midnight.strftime('%Y-%m-%d %H:%M:%S')}，距离现在还有 {seconds_until_midnight:.0f} 秒")
+    
+    def task():
+        # 执行抓取任务
+        fetch_fund_list()
+        # 设置下一个定时任务（每天执行一次）
+        schedule_daily_fetch()
+    
+    # 设置定时器
+    timer = threading.Timer(seconds_until_midnight, task)
+    timer.daemon = True  # 设置为守护线程，主线程退出时自动退出
+    timer.start()
+
 
 @app.route('/api/fund_list', methods=['GET'])
 def get_fund_list():
@@ -37,58 +145,16 @@ def get_fund_list():
         query = request.args.get('query', '').strip()
         limit = min(int(request.args.get('limit', 20)), 100)
         
-        # 检查缓存是否有效
-        current_time = time.time()
-        if (fund_list_cache['data'] is None or 
-            current_time - fund_list_cache['timestamp'] > fund_list_cache['cache_duration']):
-            
-            print("正在获取基金列表数据...")
-            try:
-                # 使用fund_open_fund_daily_em获取开放式基金数据
-                fund_df = ak.fund_open_fund_daily_em()
-                
-                if fund_df.empty:
-                    return jsonify({
-                        'success': False,
-                        'error': '无法获取基金列表数据'
-                    }), 500
-                
-                # 处理数据格式，提取需要的字段
-                fund_list = []
-                for _, row in fund_df.iterrows():
-                    try:
-                        fund_info = {
-                            'code': str(row.get('基金代码', '')),
-                            'name': str(row.get('基金简称', '')),
-                            'net_value': float(row.get('单位净值', 0)) if pd.notna(row.get('单位净值')) else 0,
-                            'daily_growth': float(row.get('日增长率', 0)) if pd.notna(row.get('日增长率')) else 0,
-                            'total_value': float(row.get('累计净值', 0)) if pd.notna(row.get('累计净值')) else 0
-                        }
-                        
-                        # 过滤掉无效数据
-                        if fund_info['code'] and fund_info['name']:
-                            fund_list.append(fund_info)
-                    except Exception as e:
-                        # 跳过有问题的数据行
-                        continue
-                
-                # 更新缓存
-                fund_list_cache['data'] = fund_list
-                fund_list_cache['timestamp'] = current_time
-                
-                print(f"成功获取 {len(fund_list)} 只基金数据")
-                
-            except Exception as e:
-                print(f"获取基金列表失败: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': f'获取基金列表失败: {str(e)}'
-                }), 500
-        else:
-            print("使用缓存的基金列表数据")
+        # 从缓存中获取数据（如果缓存为空，返回错误）
+        with cache_lock:
+            fund_list = fund_list_cache['data']
+            cache_timestamp = fund_list_cache['timestamp']
         
-        # 从缓存中获取数据
-        fund_list = fund_list_cache['data']
+        if fund_list is None:
+            return jsonify({
+                'success': False,
+                'error': '基金列表数据正在加载中，请稍后重试'
+            }), 503
         
         # 如果有搜索查询，进行模糊匹配
         if query:
@@ -127,7 +193,7 @@ def get_fund_list():
                 'funds': result_funds,
                 'total_count': len(fund_list),
                 'returned_count': len(result_funds),
-                'cache_time': datetime.fromtimestamp(fund_list_cache['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
+                'cache_time': datetime.fromtimestamp(cache_timestamp).strftime('%Y-%m-%d %H:%M:%S')
             },
         })
         
@@ -395,8 +461,16 @@ def serve_static_files(filename):
             'error': f'文件加载失败: {str(e)}'
         }), 404
 
+# 模块导入时自动初始化（适用于gunicorn等场景）
+init_fund_cache()
+
 if __name__ == '__main__':
-    print("启动基金数据API服务...")
+    print("\n" + "=" * 60)
+    print("📊 启动基金数据API服务")
+    print("=" * 60)
     print("请确保已安装依赖: pip install akshare flask flask-cors pandas")
-    # 生产环境建议使用: gunicorn -w 4 -b 0.0.0.0:8080 fund_api:app
+    print("=" * 60 + "\n")
+    
+    # 初始化已完成（在模块导入时执行）
+    # 如果使用 gunicorn，请使用: gunicorn -w 4 -b 0.0.0.0:8080 fund_api:app
     app.run(host='0.0.0.0', port=8080, debug=False) 
