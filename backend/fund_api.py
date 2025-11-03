@@ -61,26 +61,33 @@ def init_fund_cache():
 def fetch_fund_list():
     """
     抓取基金列表数据并更新缓存
+    使用 fund_name_em 获取所有基金的基本信息（包含几万条数据）
     """
     try:
         print("正在获取基金列表数据...")
-        # 使用fund_open_fund_daily_em获取开放式基金数据
-        fund_df = ak.fund_open_fund_daily_em()
+        # 使用fund_name_em获取所有基金的基本信息（包含几万条数据）
+        # 参考: https://akshare.akfamily.xyz/data/fund/fund_public.html#id14
+        fund_df = ak.fund_name_em()
         
         if fund_df.empty:
             print("警告: 获取到的基金列表数据为空")
             return False
+        
+        print(f"从AKShare获取到 {len(fund_df)} 条原始数据，正在处理...")
         
         # 处理数据格式，提取需要的字段
         fund_list = []
         for _, row in fund_df.iterrows():
             try:
                 fund_info = {
-                    'code': str(row.get('基金代码', '')),
-                    'name': str(row.get('基金简称', '')),
-                    'net_value': float(row.get('单位净值', 0)) if pd.notna(row.get('单位净值')) else 0,
-                    'daily_growth': float(row.get('日增长率', 0)) if pd.notna(row.get('日增长率')) else 0,
-                    'total_value': float(row.get('累计净值', 0)) if pd.notna(row.get('累计净值')) else 0
+                    'code': str(row.get('基金代码', '')).strip(),
+                    'name': str(row.get('基金简称', '')).strip(),
+                    'type': str(row.get('基金类型', '')).strip() if pd.notna(row.get('基金类型')) else '',
+                    # 注意: fund_name_em不包含实时净值数据，这些字段暂时设为0
+                    # 如需实时数据，可以在查询时单独获取
+                    'net_value': 0,
+                    'daily_growth': 0,
+                    'total_value': 0
                 }
                 
                 # 过滤掉无效数据
