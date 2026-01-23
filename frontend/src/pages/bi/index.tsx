@@ -5,7 +5,7 @@ import { Toaster } from 'sonner'
 import DynamicCard from './components/DynamicCard'
 import SettingsPage from './components/SettingsPage'
 import Sidebar from './components/Sidebar'
-import { pollingService } from './lib/polling'
+import { dataService } from './lib/polling'
 import { getSettings, getStoredDynamics, getUPs, markAsRead, saveStoredDynamics } from './lib/storage'
 import type { Comment, DynamicContent, Settings, UP } from './types'
 
@@ -28,17 +28,18 @@ export function Component() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
-  // Subscribe to PollingService
+  // Subscribe to DataService
   useEffect(() => {
-    // Start service if not started or just ensure it's running with current settings
-    pollingService.start()
+    // 启动自动刷新（30秒从后端获取最新数据）
+    dataService.setRefreshInterval(30)
 
-    const unsubscribe = pollingService.subscribe(() => {
-      setDynamicsMap(getStoredDynamics())
+    const unsubscribe = dataService.subscribe((dynamics) => {
+      setDynamicsMap(dynamics)
     })
 
     return () => {
       unsubscribe()
+      dataService.stopAutoRefresh()
     }
   }, [])
 
@@ -47,7 +48,7 @@ export function Component() {
   }
 
   const handleManualRefresh = () => {
-    pollingService.forceRefreshDynamics()
+    dataService.refresh()
   }
 
   const handleMarkRead = (id: string) => {
@@ -175,8 +176,8 @@ export function Component() {
               setIsSettingsOpen(false)
               setUps(getUPs())
               setSettings(getSettings())
-              // Restart polling service to apply new settings immediately
-              pollingService.restart()
+              // 刷新数据以显示最新内容
+              dataService.refresh()
             }}
           />
         )}

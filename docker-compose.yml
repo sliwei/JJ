@@ -2,12 +2,32 @@ services:
   jj-serve:
     restart: always
     container_name: jj-serve
-    image: registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:$TAG
+    image: registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${TAG:-latest}
     environment:
       - TZ=Asia/Shanghai
       - PYTHONUNBUFFERED=1
     # ports:
     #   - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - proxy
+
+  bi-serve:
+    restart: always
+    container_name: bi-serve
+    image: registry.cn-shenzhen.aliyuncs.com/sliwei/jj-serve:${TAG:-latest}
+    environment:
+      - TZ=Asia/Shanghai
+      - PYTHONUNBUFFERED=1
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    command: ["python", "bi_api.py"]
+    # ports:
+    #   - "8081:8081"
     volumes:
       - ./logs:/app/logs
     networks:

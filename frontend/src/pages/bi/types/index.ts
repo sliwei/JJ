@@ -8,7 +8,6 @@ export interface Settings {
   cookie: string
   refreshInterval: number // in minutes
   enableNotifications: boolean
-  useMock: boolean
   // Polling settings
   enableDynamicPolling: boolean
   dynamicPollingInterval: number // in minutes

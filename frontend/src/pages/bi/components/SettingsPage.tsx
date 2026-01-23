@@ -1,55 +1,89 @@
-import { useState } from 'react'
-import type { Settings, UP } from '../types'
-import { getSettings, getUPs, saveSettings, saveUPs } from '../lib/storage'
-import { searchUP } from '../lib/api'
-import { Trash2, Save, X, Loader2, Search } from 'lucide-react'
+import { Loader2, Save, Search, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+
+import { searchUPFromBackend } from '../lib/api-backend'
+import { addUP, getSettingsAsync, getUPsAsync, removeUP, saveSettings } from '../lib/storage'
+import type { Settings, UP } from '../types'
 
 interface SettingsPageProps {
   onClose: () => void
 }
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
-  const [settings, setSettings] = useState<Settings>(getSettings())
-  const [ups, setUps] = useState<UP[]>(getUPs())
+  const [settings, setSettings] = useState<Settings | null>(null)
+  const [ups, setUps] = useState<UP[]>([])
   const [keyword, setKeyword] = useState('')
   const [searchResults, setSearchResults] = useState<UP[]>([])
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const handleSaveSettings = () => {
-    saveSettings(settings)
-    toast.success('设置已保存')
-    onClose()
+  // 初始化加载数据
+  useEffect(() => {
+    const loadData = async () => {
+      const [settingsData, upsData] = await Promise.all([getSettingsAsync(), getUPsAsync()])
+      setSettings(settingsData)
+      setUps(upsData)
+    }
+    loadData()
+  }, [])
+
+  const handleSaveSettings = async () => {
+    if (!settings) return
+    setSaving(true)
+    try {
+      await saveSettings(settings)
+      toast.success('设置已保存')
+      onClose()
+    } catch (e) {
+      toast.error('保存失败: ' + (e as Error).message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSearch = async () => {
-    if (!keyword || !settings.cookie) {
-      if (!settings.cookie) toast.error('请先设置 Cookie')
-      return
-    }
+    if (!keyword) return
     setLoading(true)
     try {
-      const results = await searchUP(keyword, settings.cookie)
+      const results = await searchUPFromBackend(keyword)
       setSearchResults(results)
+    } catch (e) {
+      toast.error('搜索失败: ' + (e as Error).message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleAddUP = (up: UP) => {
+  const handleAddUP = async (up: UP) => {
     if (ups.find((u) => u.mid === up.mid)) {
       toast.error('已在列表中')
       return
     }
-    const updatedUps = [...ups, up]
-    setUps(updatedUps)
-    saveUPs(updatedUps)
+    try {
+      await addUP(up)
+      setUps([...ups, up])
+      toast.success('已添加')
+    } catch (e) {
+      toast.error('添加失败')
+    }
   }
 
-  const handleRemoveUP = (mid: string) => {
-    const updatedUps = ups.filter((u) => u.mid !== mid)
-    setUps(updatedUps)
-    saveUPs(updatedUps)
+  const handleRemoveUP = async (mid: string) => {
+    try {
+      await removeUP(mid)
+      setUps(ups.filter((u) => u.mid !== mid))
+    } catch (e) {
+      toast.error('删除失败')
+    }
+  }
+
+  if (!settings) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-100 flex items-center justify-center">
+        <Loader2 className="animate-spin text-white" size={32} />
+      </div>
+    )
   }
 
   return (
@@ -80,31 +114,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                 />
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="notify-toggle"
-                    checked={settings.enableNotifications}
-                    onChange={(e) => setSettings({ ...settings, enableNotifications: e.target.checked })}
-                    className="mr-2.5 w-3.5 h-3.5 accent-primary"
-                  />
-                  <label htmlFor="notify-toggle" className="text-[0.85rem] cursor-pointer text-text-primary">
-                    开启浏览器消息通知
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="mock-toggle"
-                    checked={settings.useMock}
-                    onChange={(e) => setSettings({ ...settings, useMock: e.target.checked })}
-                    className="mr-2.5 w-3.5 h-3.5 accent-red-500"
-                  />
-                  <label htmlFor="mock-toggle" className="text-[0.85rem] cursor-pointer text-red-500 font-medium">
-                    开启 Mock 模式 (避风港模式)
-                  </label>
-                </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="notify-toggle"
+                  checked={settings.enableNotifications}
+                  onChange={(e) => setSettings({ ...settings, enableNotifications: e.target.checked })}
+                  className="mr-2.5 w-3.5 h-3.5 accent-primary"
+                />
+                <label htmlFor="notify-toggle" className="text-[0.85rem] cursor-pointer text-text-primary">
+                  开启浏览器消息通知
+                </label>
               </div>
             </section>
 
@@ -203,11 +223,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
           </div>
 
           <button
-            className="w-full py-2.5 text-white! rounded-lg font-semibold text-sm transition-all hover:opacity-90 active:scale-95 bg-primary! flex items-center justify-center gap-1.5 mb-8 shadow-lg shadow-primary/20"
+            className="w-full py-2.5 text-white! rounded-lg font-semibold text-sm transition-all hover:opacity-90 active:scale-95 bg-primary! flex items-center justify-center gap-1.5 mb-8 shadow-lg shadow-primary/20 disabled:opacity-50"
             onClick={handleSaveSettings}
+            disabled={saving}
           >
-            <Save size={18} />
-            保存所有配置
+            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+            {saving ? '保存中...' : '保存所有配置'}
           </button>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
