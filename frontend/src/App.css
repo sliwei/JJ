@@ -25,3 +25,58 @@
     @apply flex justify-center items-center;
   }
 }
+
+@theme {
+  --color-primary: var(--primary-color);
+  --color-secondary: var(--secondary-color);
+  --color-bg: var(--bg-color);
+  --color-sidebar: var(--sidebar-bg);
+  --color-card: var(--card-bg);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border: var(--border-color);
+  --color-hover: var(--hover-bg);
+  --color-glass: var(--glass-bg);
+  --background-image-main: var(--main-gradient);
+}
+/* Tailwind v4 uses standard CSS variables for configuration in @theme */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --primary-color: #fb7299;
+  --secondary-color: #00aeec;
+  --bg-color: #1a1a1a;
+  --sidebar-bg: #242424;
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --hover-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(26, 26, 26, 0.8);
+  --main-gradient: radial-gradient(circle at top left, #000, #1a1a1a);
+}
+
+.light {
+  --bg-color: #f6f7f8;
+  --sidebar-bg: #ffffff;
+  --card-bg: #ffffff;
+  --text-primary: #18191c;
+  --text-secondary: #61666d;
+  --border-color: #e3e5e7;
+  --hover-bg: #f1f2f3;
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --main-gradient: none;
+}
+
+/* Ensure .dark works explicitly for dark mode variants if needed */
+.dark {
+  --bg-color: #1a1a1a;
+  --sidebar-bg: #242424;
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --hover-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(26, 26, 26, 0.8);
+  --main-gradient: radial-gradient(circle at top left, #000, #1a1a1a);
+}

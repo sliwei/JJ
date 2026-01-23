@@ -2085,6 +2085,11 @@ js-cookie@^2.2.1:
   resolved "https://registry.npmmirror.com/js-cookie/-/js-cookie-2.2.1.tgz#69e106dc5d5806894562902aa5baec3744e9b2b8"
   integrity sha512-HvdH2LzI/EAZcUwA8+0nKNtWHqS+ZmijLA30RwZA0bo7ToCckjK5MkGhjED9KoRcXO6BaGI3I9UIzSA1FKFPOQ==
 
+js-md5@^0.8.3:
+  version "0.8.3"
+  resolved "https://registry.npmmirror.com/js-md5/-/js-md5-0.8.3.tgz#921bab7efa95bfc9d62b87ee08a57f8fe4305b69"
+  integrity sha512-qR0HB5uP6wCuRMrWPTrkMaev7MJZwJuuw4fnwAzRgP4J4/F8RwtodOKpGp4XpqsLBFzzgqIO42efFAyz2Et6KQ==
+
 "js-tokens@^3.0.0 || ^4.0.0", js-tokens@^4.0.0:
   version "4.0.0"
   resolved "https://registry.npmmirror.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"
@@ -2262,6 +2267,11 @@ lru-cache@^5.1.1:
   integrity sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==
   dependencies:
     yallist "^3.0.2"
+
+lucide-react@^0.562.0:
+  version "0.562.0"
+  resolved "https://registry.npmmirror.com/lucide-react/-/lucide-react-0.562.0.tgz#217796c2f57624f012b484ea7f08505067c90d51"
+  integrity sha512-82hOAu7y0dbVuFfmO4bYF1XEwYk/mEbM5E+b1jgci/udUBEE/R7LF5Ip0CCEmXe8AybRM8L+04eP+LGZeDvkiw==
 
 magic-string@^0.30.17:
   version "0.30.17"
