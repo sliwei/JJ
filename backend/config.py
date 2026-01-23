@@ -19,6 +19,10 @@ class Config:
     # Flask配置
     DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     
+    # JWT配置
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+    JWT_EXPIRES_DAYS = int(os.environ.get('JWT_EXPIRES_DAYS', 2))
+    
     # 服务端口
     FUND_API_PORT = int(os.environ.get('FUND_API_PORT', 8080))
     BI_API_PORT = int(os.environ.get('BI_API_PORT', 8081))

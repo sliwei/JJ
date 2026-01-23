@@ -1,5 +1,8 @@
+import { useAtomValue } from 'jotai'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+
+import { loginModalState } from '@/store/global'
 
 import DynamicCard from './components/DynamicCard'
 import SettingsPage from './components/SettingsPage'
@@ -15,6 +18,10 @@ export function Component() {
   const [dynamicsMap, setDynamicsMap] = useState<Record<string, DynamicContent[]>>(getStoredDynamics())
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
+  // 使用全局登录弹窗状态，判断是否已登录
+  const showLoginModal = useAtomValue(loginModalState)
+  const isLoggedIn = !!localStorage.getItem('token') && !showLoginModal
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
   })
@@ -27,17 +34,26 @@ export function Component() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
-  // 页面加载时从后端获取用户列表
+  // 页面加载时从后端获取用户列表（仅在登录后）
   useEffect(() => {
-    getUPsAsync().then((upsFromBackend) => {
-      if (upsFromBackend.length > 0) {
-        setUps(upsFromBackend)
-      }
-    })
-  }, [])
+    if (!isLoggedIn) return
 
-  // Subscribe to DataService
+    getUPsAsync()
+      .then((upsFromBackend) => {
+        if (upsFromBackend.length > 0) {
+          setUps(upsFromBackend)
+        }
+      })
+      .catch((err) => {
+        // AUTH_REQUIRED 错误会由 api-backend 自动触发登录弹窗
+        console.error('获取 UP 列表失败:', err?.message)
+      })
+  }, [isLoggedIn])
+
+  // Subscribe to DataService（仅在登录后）
   useEffect(() => {
+    if (!isLoggedIn) return
+
     // 启动自动刷新（30秒从后端获取最新数据）
     dataService.setRefreshInterval(30)
 
@@ -49,7 +65,7 @@ export function Component() {
       unsubscribe()
       dataService.stopAutoRefresh()
     }
-  }, [])
+  }, [isLoggedIn])
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))

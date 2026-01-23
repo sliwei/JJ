@@ -8,16 +8,140 @@ Bili Monitor API Blueprint
 import json
 import traceback
 import requests
+import hashlib
+from datetime import datetime, timedelta
+from functools import wraps
 from typing import List, Dict
 
+import jwt
 from flask import Blueprint, request, jsonify
 
+from config import Config
 from services.database import db
 from services.polling import polling_service
 from utils.wbi import get_signed_params
 
 # 创建Blueprint
 bi_bp = Blueprint('bi', __name__, url_prefix='/api/bi')
+
+
+# ============== JWT 认证 ==============
+
+def generate_token(user_id: int, username: str) -> str:
+    """生成JWT Token"""
+    payload = {
+        'user_id': user_id,
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(days=Config.JWT_EXPIRES_DAYS),
+        'iat': datetime.utcnow()
+    }
+    return jwt.encode(payload, Config.JWT_SECRET_KEY, algorithm='HS256')
+
+
+def verify_token(token: str) -> dict:
+    """验证JWT Token，返回payload或None"""
+    try:
+        payload = jwt.decode(token, Config.JWT_SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+def require_token(f):
+    """Token校验装饰器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization', '')
+        
+        if not auth_header:
+            return jsonify({'success': False, 'error': '未提供认证令牌'}), 401
+        
+        # 支持 "Bearer <token>" 格式
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+        else:
+            token = auth_header
+        
+        payload = verify_token(token)
+        if not payload:
+            return jsonify({'success': False, 'error': '认证令牌无效或已过期'}), 401
+        
+        # 将用户信息存入请求上下文
+        request.current_user = payload
+        return f(*args, **kwargs)
+    
+    return decorated
+
+
+def md5_hash(text: str) -> str:
+    """MD5加密"""
+    return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+
+# ============== 登录接口 ==============
+
+@bi_bp.route('/login', methods=['POST'])
+def login():
+    """用户登录"""
+    err = _check_db()
+    if err:
+        return err
+    
+    try:
+        data = request.json
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        
+        if not username or not password:
+            return jsonify({'success': False, 'error': '用户名和密码不能为空'}), 400
+        
+        # 查询用户
+        sql = "SELECT id, name, user, password, allow FROM bstu_user WHERE user = %s"
+        user = db.execute_query(sql, (username,), fetch_one=True)
+        
+        if not user:
+            return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+        
+        # 检查是否允许登录
+        if not user.get('allow'):
+            return jsonify({'success': False, 'error': '账号已被禁用'}), 403
+        
+        # 验证密码（支持明文和MD5两种方式）
+        stored_password = user.get('password', '')
+        password_valid = (
+            stored_password == password or  # 明文比对
+            stored_password == md5_hash(password)  # MD5比对
+        )
+        
+        if not password_valid:
+            return jsonify({'success': False, 'error': '用户名或密码错误'}), 401
+        
+        # 更新最近登录时间
+        db.execute_modify(
+            "UPDATE bstu_user SET newly_login = NOW() WHERE id = %s",
+            (user['id'],)
+        )
+        
+        # 生成Token
+        token = generate_token(user['id'], user['user'])
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'token': token,
+                'user': {
+                    'id': user['id'],
+                    'name': user['name'],
+                    'username': user['user']
+                }
+            }
+        })
+    except Exception as e:
+        print(f"登录失败: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 def _check_db():
@@ -33,6 +157,7 @@ def _check_db():
 # ============== Settings API ==============
 
 @bi_bp.route('/settings', methods=['GET'])
+@require_token
 def get_settings():
     """获取设置"""
     err = _check_db()
@@ -82,6 +207,7 @@ def get_settings():
 
 
 @bi_bp.route('/settings', methods=['POST'])
+@require_token
 def save_settings():
     """保存设置"""
     err = _check_db()
@@ -134,6 +260,7 @@ def save_settings():
 # ============== UPs API ==============
 
 @bi_bp.route('/ups', methods=['GET'])
+@require_token
 def get_ups():
     """获取UP主列表"""
     err = _check_db()
@@ -153,6 +280,7 @@ def get_ups():
 
 
 @bi_bp.route('/ups', methods=['POST'])
+@require_token
 def add_up():
     """添加UP主"""
     err = _check_db()
@@ -174,6 +302,7 @@ def add_up():
 
 
 @bi_bp.route('/ups/<mid>', methods=['DELETE'])
+@require_token
 def remove_up(mid: str):
     """删除UP主"""
     err = _check_db()
@@ -189,6 +318,7 @@ def remove_up(mid: str):
 
 
 @bi_bp.route('/ups/search', methods=['GET'])
+@require_token
 def search_up():
     """搜索UP主（从B站API）"""
     err = _check_db()
@@ -290,6 +420,7 @@ def get_comments_for_dynamic(dynamic_id: str) -> List[Dict]:
 
 
 @bi_bp.route('/dynamics', methods=['GET'])
+@require_token
 def get_dynamics():
     """获取动态列表"""
     err = _check_db()
@@ -348,6 +479,7 @@ def get_dynamics():
 
 
 @bi_bp.route('/dynamics/grouped', methods=['GET'])
+@require_token
 def get_dynamics_grouped():
     """获取按UP主分组的动态"""
     err = _check_db()
@@ -397,6 +529,7 @@ def get_dynamics_grouped():
 # ============== Read Status API ==============
 
 @bi_bp.route('/read', methods=['POST'])
+@require_token
 def mark_as_read():
     """标记为已读"""
     err = _check_db()
@@ -427,6 +560,7 @@ def mark_as_read():
 
 
 @bi_bp.route('/read/<item_id>', methods=['GET'])
+@require_token
 def check_read_status(item_id: str):
     """检查是否已读"""
     err = _check_db()
