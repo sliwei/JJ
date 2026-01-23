@@ -59,7 +59,7 @@ export default defineConfig(({ mode, command }) => {
           rewrite: (path) => path.replace(/^\/core_api/, '')
         },
         '/api/bi': {
-          target: 'http://localhost:8081',
+          target: 'http://localhost:8080',
           changeOrigin: true
         },
         '/bili': {

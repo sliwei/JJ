@@ -15,11 +15,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p /app/logs
 
 # 复制后端项目文件
-COPY backend/fund_api.py .
-COPY backend/start_api.py .
+COPY backend/app.py .
+COPY backend/config.py .
 COPY backend/gunicorn.conf.py .
+COPY backend/blueprints blueprints/
+COPY backend/services services/
+COPY backend/utils utils/
 
-# 创建前端目录结构并复制构建产物到根目录
+# 创建前端目录结构并复制构建产物
 RUN mkdir -p /frontend
 COPY frontend/dist /frontend/dist
 
@@ -27,4 +30,4 @@ COPY frontend/dist /frontend/dist
 EXPOSE 8080
 
 # 使用gunicorn启动应用 (生产环境)
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "fund_api:app"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]

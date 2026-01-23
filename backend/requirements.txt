@@ -1,9 +1,22 @@
-akshare>=1.12.0
+# JJ Simulator Backend 依赖
+# 使用阿里云镜像源
+-i https://mirrors.aliyun.com/pypi/simple/
+
+# Web框架
 flask>=2.3.0
 flask-cors>=4.0.0
-pandas>=2.0.0
-requests>=2.31.0
 gunicorn>=21.2.0
+
+# 数据处理
+pandas>=2.0.0
+akshare>=1.12.0
+
+# HTTP请求
+requests>=2.31.0
+
+# 数据库（Bili Monitor功能需要）
 pymysql>=1.1.0
 dbutils>=3.0.0
+
+# 环境变量
 python-dotenv>=1.0.0
