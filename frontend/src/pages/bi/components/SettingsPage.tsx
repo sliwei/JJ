@@ -258,7 +258,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                     key={up.mid}
                     className="flex items-center p-2.5 mb-1.5 rounded-lg bg-black/5 border border-transparent hover:border-border/50 transition-colors"
                   >
-                    <img src={up.face} className="w-8 h-8 rounded-full mr-2.5 object-cover" />
+                    <img src={up.face} className="w-8 h-8 rounded-full mr-2.5 object-cover" referrerPolicy="no-referrer" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-[0.85rem] truncate text-text-primary">{up.name}</div>
                       <div className="text-[0.7rem] text-text-secondary">MID: {up.mid}</div>
@@ -280,7 +280,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                 {ups.length === 0 && <div className="text-text-secondary text-center py-10 text-sm">暂无 UP</div>}
                 {ups.map((up) => (
                   <div key={up.mid} className="flex items-center p-2.5 mb-1.5 rounded-lg transition-colors hover:bg-hover">
-                    <img src={up.face} className="w-8 h-8 rounded-full mr-2.5 object-cover" />
+                    <img src={up.face} className="w-8 h-8 rounded-full mr-2.5 object-cover" referrerPolicy="no-referrer" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-[0.85rem] truncate text-text-primary">{up.name}</div>
                       <div className="text-[0.7rem] text-text-secondary">MID: {up.mid}</div>

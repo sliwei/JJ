@@ -43,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({ ups, activeMid, unreadCounts, onSelec
             onClick={() => onSelectUP(up.mid)}
           >
             <div className="flex items-center overflow-hidden">
-              <img src={up.face} alt={up.name} className="w-8 h-8 rounded-full mr-2.5 object-cover shrink-0" />
+              <img src={up.face} alt={up.name} className="w-8 h-8 rounded-full mr-2.5 object-cover shrink-0" referrerPolicy="no-referrer" />
               <span className="font-medium text-[0.9rem] truncate">{up.name}</span>
             </div>
             {unreadCounts[up.mid] > 0 && (
