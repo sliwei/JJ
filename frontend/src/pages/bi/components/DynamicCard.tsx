@@ -114,7 +114,7 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
             {dynamic.title}
           </h3>
           {dynamic.description && (
-            <div className="text-text-secondary text-[0.8rem] line-clamp-2">
+            <div className="text-text-secondary text-[0.8rem]">
               {dynamic.description}
             </div>
           )}
