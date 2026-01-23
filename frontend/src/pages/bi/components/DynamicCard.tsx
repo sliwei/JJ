@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { CheckCircle, MessageSquare } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 
 import type { Comment, DynamicContent } from '../types'
 import CommentSection from './CommentSection'
@@ -48,6 +48,14 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
     handleMarkRead()
   }
 
+  const allCommentCount = useMemo(() => {
+    let len = dynamic.comments?.length || 0
+    dynamic.comments?.forEach((c) => {
+      len += c.replies?.length || 0
+    })
+    return len
+  }, [dynamic.comments])
+
   return (
     <div
       className={`bg-card border rounded-xl mb-4 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 shadow-sm ${isDynamicUnread ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'}`}
@@ -70,10 +78,10 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
           )}
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex items-center text-text-secondary hover:text-primary! transition-colors relative"
+            className="flex items-center text-text-secondary hover:text-primary! transition-colors relative cursor-pointer"
           >
             <MessageSquare size={12} className="mr-1" />
-            评论
+            评论{allCommentCount}
             {unreadCommentCount > 0 && (
               <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[0.6rem] px-1 rounded-full min-w-3.5 text-center h-3.5 leading-tight flex items-center justify-center">
                 {unreadCommentCount}

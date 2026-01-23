@@ -150,7 +150,7 @@ class PollingService:
                     print(f"轮询UP {up['name']} 动态失败: {e}")
                     traceback.print_exc()
             
-            self._log_poll('dynamic', 'success', f'轮询完成，新增{new_count}条动态', new_count)
+            # self._log_poll('dynamic', 'success', f'轮询完成，新增{new_count}条动态', new_count)
             
         except Exception as e:
             print(f"动态轮询失败: {e}")
@@ -218,7 +218,7 @@ class PollingService:
                 except Exception as e:
                     print(f"轮询动态 {d['dynamic_id']} 评论失败: {e}")
             
-            self._log_poll('comment', 'success', f'轮询完成，新增{new_count}条UP主评论', new_count)
+            # self._log_poll('comment', 'success', f'轮询完成，新增{new_count}条UP主评论', new_count)
             
         except Exception as e:
             print(f"评论轮询失败: {e}")

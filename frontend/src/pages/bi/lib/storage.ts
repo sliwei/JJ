@@ -139,9 +139,9 @@ export const saveReadIds = (ids: string[]): void => {
   readIdsCache = new Set(ids)
 }
 
-export const markAsRead = async (id: string): Promise<void> => {
+export const markAsRead = async (id: string, type: 'dynamic' | 'comment' = 'dynamic'): Promise<void> => {
   try {
-    await markAsReadOnBackend(id, 'dynamic')
+    await markAsReadOnBackend(id, type)
     readIdsCache.add(id)
   } catch (e) {
     console.error('标记已读失败:', e)
