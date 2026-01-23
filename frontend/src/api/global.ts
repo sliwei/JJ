@@ -34,7 +34,7 @@ export interface FundListRes {
 
 export const getFundList = (query: string) => {
   return request.get<Res<FundListRes>, Res<FundListRes>>(
-    `${import.meta.env.VITE_APP_API1}/api/fund_list?query=${encodeURIComponent(query)}&limit=10`
+    `/api/fund_list?query=${encodeURIComponent(query)}&limit=10`
   )
 }
 
@@ -54,6 +54,6 @@ export interface FundDataRes {
 
 export const getFundData = ({ fundCode, startDate, endDate }: { fundCode: string; startDate?: string; endDate?: string }) => {
   return request.get<Res<FundDataRes>, Res<FundDataRes>>(
-    `${import.meta.env.VITE_APP_API1}/api/fund_data?code=${fundCode}&start_date=${startDate || ''}&end_date=${endDate || ''}`
+    `/api/fund_data?code=${fundCode}&start_date=${startDate || ''}&end_date=${endDate || ''}`
   )
 }

@@ -53,12 +53,7 @@ export default defineConfig(({ mode, command }) => {
       // 调整开发环境 sourcemap 配置
       sourcemap: 'inline', // 更快的 sourcemap 生成方式
       proxy: {
-        '^/core_api': {
-          target: 'http://localhost:8080',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/core_api/, '')
-        },
-        '/api/bi': {
+        '/api': {
           target: 'http://localhost:8080',
           changeOrigin: true
         },
