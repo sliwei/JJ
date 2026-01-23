@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai'
-import { Bell, RefreshCw } from 'lucide-react'
+import { Bell, Menu, RefreshCw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { loginModalState } from '@/store/global'
@@ -17,6 +17,7 @@ export function Component() {
   const [activeMid, setActiveMid] = useState<string | null>(null)
   const [dynamicsMap, setDynamicsMap] = useState<Record<string, DynamicContent[]>>(getStoredDynamics())
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   // 使用全局登录弹窗状态，判断是否已登录
   const showLoginModal = useAtomValue(loginModalState)
@@ -140,25 +141,45 @@ export function Component() {
         ups={ups}
         activeMid={activeMid}
         unreadCounts={unreadCounts}
-        onSelectUP={setActiveMid}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onAddUP={() => setIsSettingsOpen(true)}
+        onSelectUP={(mid) => {
+          setActiveMid(mid)
+          setIsSidebarOpen(false)
+        }}
+        onOpenSettings={() => {
+          setIsSettingsOpen(true)
+          setIsSidebarOpen(false)
+        }}
+        onAddUP={() => {
+          setIsSettingsOpen(true)
+          setIsSidebarOpen(false)
+        }}
         theme={theme}
         onToggleTheme={toggleTheme}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
-      <main className="flex-1 flex flex-col bg-main">
-        <header className="h-14 px-5 flex justify-between items-center bg-glass backdrop-blur-md border-b border-border z-10">
+      <main className="flex-1 flex flex-col bg-main w-full md:w-auto">
+        <header className="h-14 px-3 md:px-5 flex justify-between items-center bg-glass backdrop-blur-md border-b border-border z-10">
           <div className="flex items-center">
-            <h2 className="text-[1.1rem] font-bold">{activeUP ? `${activeUP.name} 的动态` : '请选择或添加 UP 主'}</h2>
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 mr-2 rounded-lg hover:bg-hover active:scale-95 transition md:hidden"
+              title="打开菜单"
+            >
+              <Menu size={20} />
+            </button>
+            <h2 className="text-[0.95rem] md:text-[1.1rem] font-bold truncate max-w-[140px] md:max-w-none">
+              {activeUP ? `${activeUP.name} 的动态` : '请选择 UP 主'}
+            </h2>
             <button
               onClick={handleManualRefresh}
-              className="ml-3 p-1.5 rounded-full hover:bg-hover active:scale-95 transition"
+              className="ml-2 md:ml-3 p-1.5 rounded-full hover:bg-hover active:scale-95 transition"
               title="手动刷新动态"
             >
               <RefreshCw size={16} />
             </button>
-            <label className="ml-4 flex items-center gap-1.5 text-sm cursor-pointer select-none">
+            <label className="ml-2 md:ml-4 flex items-center gap-1 md:gap-1.5 text-xs md:text-sm cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={onlyShowUP}
@@ -171,7 +192,7 @@ export function Component() {
           <div className="flex gap-3">{settings.enableNotifications && <Bell size={18} className="text-primary" />}</div>
         </header>
 
-        <section className="flex-1 overflow-y-auto p-4 relative">
+        <section className="flex-1 overflow-y-auto p-3 md:p-4 relative">
           {!activeMid && <div className="text-center mt-20 text-text-secondary text-sm">请在左侧选择一个 UP 主，或点击设置添加</div>}
 
           {ups.map((up) => {

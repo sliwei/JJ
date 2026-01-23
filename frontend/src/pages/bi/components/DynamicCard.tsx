@@ -58,30 +58,31 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
 
   return (
     <div
-      className={`bg-card border rounded-xl mb-4 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 shadow-sm ${isDynamicUnread ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'}`}
+      className={`bg-card border rounded-xl mb-3 md:mb-4 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 shadow-sm ${isDynamicUnread ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'}`}
     >
-      <div className="px-4 py-2 border-b border-border text-[0.75rem] flex justify-between bg-black/5 dark:bg-black/10">
-        <div className="flex items-center gap-2">
-          <span>{formattedTime}</span>
-          {isDynamicUnread && <span className="text-primary font-bold text-[0.7rem] bg-primary/10 px-1.5 rounded">NEW</span>}
+      <div className="px-3 md:px-4 py-2 border-b border-border text-[0.7rem] md:text-[0.75rem] flex justify-between bg-black/5 dark:bg-black/10">
+        <div className="flex items-center gap-1.5 md:gap-2">
+          <span className="hidden md:inline">{formattedTime}</span>
+          <span className="md:hidden">{dayjs(dynamic.timestamp * 1000).format('MM-DD HH:mm')}</span>
+          {isDynamicUnread && <span className="text-primary font-bold text-[0.65rem] md:text-[0.7rem] bg-primary/10 px-1 md:px-1.5 rounded">NEW</span>}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
           {isDynamicUnread && onMarkRead && (
             <button
               onClick={handleMarkRead}
               className="flex items-center hover:text-primary! transition-colors cursor-pointer"
               title="标记动态为已读"
             >
-              <CheckCircle size={12} className="mr-1" />
-              已读
+              <CheckCircle size={12} className="mr-0.5 md:mr-1" />
+              <span className="hidden md:inline">已读</span>
             </button>
           )}
           <button
             onClick={() => setShowComments(!showComments)}
             className="flex items-center text-text-secondary hover:text-primary! transition-colors relative cursor-pointer"
           >
-            <MessageSquare size={12} className="mr-1" />
-            评论{allCommentCount}
+            <MessageSquare size={12} className="mr-0.5 md:mr-1" />
+            <span className="hidden md:inline">评论</span>{allCommentCount}
             {unreadCommentCount > 0 && (
               <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[0.6rem] px-1 rounded-full min-w-3.5 text-center h-3.5 leading-tight flex items-center justify-center">
                 {unreadCommentCount}
@@ -90,9 +91,9 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
           </button>
         </div>
       </div>
-      <div className="flex p-4">
+      <div className="flex flex-col md:flex-row p-3 md:p-4">
         {images.length > 0 && (
-          <div className="w-36 mr-4 shrink-0">
+          <div className="w-full md:w-36 mb-3 md:mb-0 md:mr-4 shrink-0">
             <div
               className="relative group cursor-zoom-in aspect-video rounded-md overflow-hidden bg-black/5 dark:bg-black/20"
               onClick={(e) => openPreview(e, 0)}
@@ -108,13 +109,13 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
         )}
         <div className="flex-1 min-w-0 flex flex-col">
           <h3
-            className={`text-base font-semibold mb-2 text-text-primary line-clamp-1 cursor-pointer hover:text-primary transition-colors ${isDynamicUnread ? 'text-primary' : ''}`}
+            className={`text-[0.95rem] md:text-base font-semibold mb-1.5 md:mb-2 text-text-primary line-clamp-2 md:line-clamp-1 cursor-pointer hover:text-primary transition-colors ${isDynamicUnread ? 'text-primary' : ''}`}
             onClick={handleTitleClick}
           >
             {dynamic.title}
           </h3>
           {dynamic.description && (
-            <div className="text-text-secondary text-[0.8rem]">
+            <div className="text-text-secondary text-[0.75rem] md:text-[0.8rem] line-clamp-3 md:line-clamp-none">
               {dynamic.description}
             </div>
           )}

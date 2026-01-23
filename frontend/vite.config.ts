@@ -55,6 +55,7 @@ export default defineConfig(({ mode, command }) => {
       proxy: {
         '/api': {
           target: 'http://localhost:8080',
+          // target: 'https://jj.bstu.cn',
           changeOrigin: true
         },
         '/bili': {
