@@ -57,6 +57,7 @@ const ImagePreview: React.FC<ImagePreviewProps> = ({ images, initialIndex = 0, i
           className="max-w-full max-h-[85vh] object-contain rounded-sm shadow-2xl transition-all"
           alt="preview-enlarged"
           onClick={onClose}
+          referrerPolicy="no-referrer"
         />
       </div>
     </Modal>

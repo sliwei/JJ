@@ -97,7 +97,7 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
               className="relative group cursor-zoom-in aspect-video rounded-md overflow-hidden bg-black/5 dark:bg-black/20"
               onClick={(e) => openPreview(e, 0)}
             >
-              <img src={images[0]} alt="preview" className="w-full h-full object-cover transition-opacity group-hover:opacity-80" />
+              <img src={images[0]} alt="preview" className="w-full h-full object-cover transition-opacity group-hover:opacity-80" referrerPolicy="no-referrer" />
               {images.length > 1 && (
                 <div className="absolute right-1 bottom-1 px-1 py-0.5 bg-black/60 text-white text-[0.6rem] rounded backdrop-blur-sm">
                   {images.length}张

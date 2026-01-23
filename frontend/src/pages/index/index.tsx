@@ -12,6 +12,8 @@ import Code from './components/Code/indx'
 import Settings from './components/Settings'
 import SimulationParams from './components/SimulationParams/indx'
 import TrendChart from './components/TrendChart'
+import { Link } from 'react-router'
+import { VideoIcon } from 'lucide-react'
 
 // 定义表单数据类型
 export interface FormData {
@@ -138,10 +140,14 @@ export function Component() {
       <div className="container mx-auto p-6 max-w-full">
         {/* 标题栏和设置按钮 */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-3xl font-bold text-gray-800 flex-1">
             <span className="inline-block origin-center rotate-180">J</span>
             <span>J</span> Simulator
           </h1>
+          <Link to="/bi" className="text-gray-600 hover:text-gray-700 mx-4 flex items-center space-x-2">
+            <VideoIcon size={18} />
+            <span className="text-sm">Bili Monitor</span>
+          </Link>
           <Settings />
         </div>
 

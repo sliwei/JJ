@@ -96,6 +96,7 @@ const parseEmoteContent = (content: string): ReactNode => {
           alt={emoteKey}
           title={emoteKey}
           className="inline-block align-middle h-[1.25em] w-auto mx-0.5"
+          referrerPolicy="no-referrer"
         />
       )
     } else {
@@ -137,7 +138,7 @@ const CommentItem: FC<{
 
   return (
     <div className={`flex ${isSub ? 'mt-2' : 'mt-3'} ${isUnread ? 'bg-primary/5 p-2 rounded-lg border border-primary/20' : ''}`}>
-      <img src={comment.userFace} alt={comment.userName} className={`${isSub ? 'w-5 h-5' : 'w-7 h-7'} rounded-full mr-2.5 shrink-0`} />
+      <img src={comment.userFace} alt={comment.userName} className={`${isSub ? 'w-5 h-5' : 'w-7 h-7'} rounded-full mr-2.5 shrink-0`} referrerPolicy="no-referrer" />
       <div className="flex-1 min-w-0">
         <div className="flex justify-between mb-0.5 items-start">
           <div className="flex items-center gap-1.5 flex-wrap">
