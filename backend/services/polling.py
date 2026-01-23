@@ -305,6 +305,8 @@ class PollingService:
                     pics = opus.get('pics', [])
                     d['cover'] = pics[0].get('url', '') if pics else ''
                     d['jumpUrl'] = opus.get('jump_url', d['jumpUrl'])
+                    # opus.summary.text
+                    d['description'] = opus.get('summary', {}).get('text', '')
                     d['commentType'] = 13
 
             basic = item.get('basic', {})
@@ -544,7 +546,8 @@ class PollingService:
         
         keyword = settings.get('dingtalk_keyword', '动态')
         time_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
-        
+        # jump_url = //www.bilibili.com/opus/1160909203205783557
+        jump_url = jump_url.replace('//www.bilibili.com', 'https://www.bilibili.com')
         markdown = {
             'title': f'{keyword}更新: {up_name}',
             'text': (
