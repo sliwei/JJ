@@ -173,14 +173,13 @@ class PollingService:
             ups = self._get_ups()
             ups_map = {u['mid']: u for u in ups}
             
-            now = time.time()
-            time_limit = int(settings.get('comment_time_range', 48)) * 3600
+            dynamic_count = int(settings.get('comment_time_range', 5))
             
             sql = """
                 SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url
-                FROM bi_dynamics WHERE timestamp > %s
+                FROM bi_dynamics ORDER BY timestamp DESC LIMIT %s
             """
-            dynamics = db.execute_query(sql, (now - time_limit,))
+            dynamics = db.execute_query(sql, (dynamic_count,))
             new_count = 0
             for d in dynamics:
                 try:

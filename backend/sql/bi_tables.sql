@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS `bi_settings` (
     `dynamic_polling_interval` INT DEFAULT 5 COMMENT '动态轮询间隔(分钟)',
     `enable_comment_polling` TINYINT(1) DEFAULT 0 COMMENT '启用评论轮询',
     `comment_polling_interval` INT DEFAULT 5 COMMENT '评论轮询间隔(分钟)',
-    `comment_time_range` INT DEFAULT 48 COMMENT '评论时间范围(小时)',
+    `comment_time_range` INT DEFAULT 5 COMMENT '评论时间范围(小时)',
     `dingtalk_access_token` VARCHAR(255) DEFAULT '' COMMENT '钉钉AccessToken',
     `dingtalk_keyword` VARCHAR(50) DEFAULT '动态' COMMENT '钉钉关键词',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `bi_settings` (
 INSERT INTO `bi_settings` (`id`, `cookie`, `refresh_interval`, `enable_notifications`, `use_mock`, 
     `enable_dynamic_polling`, `dynamic_polling_interval`, `enable_comment_polling`, 
     `comment_polling_interval`, `comment_time_range`, `dingtalk_access_token`, `dingtalk_keyword`)
-VALUES (1, '', 5, 1, 1, 0, 5, 0, 5, 48, '', '动态')
+VALUES (1, '', 5, 1, 1, 0, 5, 0, 5, 5, '', '动态')
 ON DUPLICATE KEY UPDATE `id` = `id`;
 
 -- UP主表

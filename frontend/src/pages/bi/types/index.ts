@@ -13,7 +13,7 @@ export interface Settings {
   dynamicPollingInterval: number // in minutes
   enableCommentPolling: boolean
   commentPollingInterval: number // in minutes
-  commentTimeRange: number // in hours, determines how far back to fetch comments for dynamics
+  commentTimeRange: number // number of recent dynamics to fetch comments for
   // DingTalk webhook settings
   dingtalkAccessToken: string
   dingtalkKeyword: string

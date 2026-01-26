@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: Settings = {
   dynamicPollingInterval: 5,
   enableCommentPolling: false,
   commentPollingInterval: 5,
-  commentTimeRange: 48,
+  commentTimeRange: 5,
   dingtalkAccessToken: '',
   dingtalkKeyword: '动态'
 }

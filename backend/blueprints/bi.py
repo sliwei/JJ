@@ -179,7 +179,7 @@ def get_settings():
                     'dynamicPollingInterval': 5,
                     'enableCommentPolling': False,
                     'commentPollingInterval': 5,
-                    'commentTimeRange': 48,
+                    'commentTimeRange': 5,
                     'dingtalkAccessToken': '',
                     'dingtalkKeyword': '动态'
                 }
@@ -241,7 +241,7 @@ def save_settings():
             data.get('dynamicPollingInterval', 5),
             1 if data.get('enableCommentPolling', False) else 0,
             data.get('commentPollingInterval', 5),
-            data.get('commentTimeRange', 48),
+            data.get('commentTimeRange', 5),
             data.get('dingtalkAccessToken', ''),
             data.get('dingtalkKeyword', '动态')
         )

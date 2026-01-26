@@ -178,7 +178,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                       />
                     </div>
                     <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                      <span className="text-xs text-text-secondary w-20 md:w-24">时间范围 (小时)</span>
+                      <span className="text-xs text-text-secondary w-20 md:w-24">动态数量</span>
                       <input
                         type="number"
                         min="1"
@@ -186,7 +186,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onClose }) => {
                         value={settings.commentTimeRange}
                         onChange={(e) => setSettings({ ...settings, commentTimeRange: Math.max(1, parseInt(e.target.value) || 1) })}
                       />
-                      <span className="text-[0.65rem] md:text-[0.7rem] text-text-secondary">只获取此时间内的动态评论</span>
+                      <span className="text-[0.65rem] md:text-[0.7rem] text-text-secondary">获取最近x条动态的评论</span>
                     </div>
                   </div>
                 )}
