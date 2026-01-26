@@ -56,14 +56,18 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
     return len
   }, [dynamic.comments])
 
+  const isToday = dayjs(dynamic.timestamp * 1000).isSame(dayjs(), 'day')
+
   return (
     <div
       className={`bg-card border rounded-xl mb-3 md:mb-4 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 shadow-sm ${isDynamicUnread ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'}`}
     >
       <div className="px-3 md:px-4 py-2 border-b border-border text-[0.7rem] md:text-[0.75rem] flex justify-between bg-black/5 dark:bg-black/10">
         <div className="flex items-center gap-1.5 md:gap-2">
-          <span className="hidden md:inline">{formattedTime}</span>
-          <span className="md:hidden">{dayjs(dynamic.timestamp * 1000).format('MM-DD HH:mm')}</span>
+          {/* 当天的日期加粗 */}
+          <span className={`hidden md:inline ${isToday ? 'font-bold' : ''}`}>{formattedTime}</span>
+          {/* 当天的日期加粗 */}
+          <span className={`md:hidden ${isToday ? 'font-bold' : ''}`}>{dayjs(dynamic.timestamp * 1000).format('MM-DD HH:mm')}</span>
           {isDynamicUnread && (
             <span className="text-primary font-bold text-[0.65rem] md:text-[0.7rem] bg-primary/10 px-1 md:px-1.5 rounded">NEW</span>
           )}
@@ -123,7 +127,9 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
             {dynamic.title}
           </h3>
           {dynamic.description && (
-            <div className="text-text-secondary text-[0.75rem] md:text-[0.8rem] line-clamp-3 md:line-clamp-none">{dynamic.description}</div>
+            <div onClick={handleTitleClick} className="text-text-secondary text-[0.75rem] md:text-[0.8rem] line-clamp-3 md:line-clamp-none">
+              {dynamic.description}
+            </div>
           )}
           <div onClick={() => setShowComments(!showComments)} className="cursor-pointer flex-1"></div>
         </div>

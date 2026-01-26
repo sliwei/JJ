@@ -135,6 +135,7 @@ const CommentItem: FC<{
   const subReplies = onlyShowUP ? allSubReplies.filter((r) => upName && r.userName === upName) : allSubReplies
   const isUp = upName && comment.userName === upName
   const isUnread = isUp && !comment.isRead
+  const isToday = dayjs(comment.timestamp * 1000).isSame(dayjs(), 'day')
 
   return (
     <div
@@ -160,7 +161,8 @@ const CommentItem: FC<{
             {isUp && <span className="text-[0.6rem] md:text-[0.65rem] text-white bg-primary px-1 py-0.5 rounded shrink-0">UP</span>}
           </div>
           <div className="flex items-center gap-1.5 md:gap-2">
-            <span className="text-[0.65rem] md:text-[0.7rem] text-text-secondary! whitespace-nowrap">
+            {/* 当天的日期加粗 */}
+            <span className={`text-[0.65rem] md:text-[0.7rem] text-text-secondary! whitespace-nowrap ${isToday ? 'font-bold' : ''}`}>
               {dayjs(comment.timestamp * 1000).format('MM-DD HH:mm')}
             </span>
             {isUnread && onMarkRead && (
