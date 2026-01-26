@@ -319,18 +319,23 @@ class PollingService:
         return dynamics
     
     def _fetch_comments(self, oid: str, type_: int, cookie: str) -> List[Dict]:
-        """从B站API获取评论"""
+        """从B站API获取评论（使用新的WBI签名接口）"""
         if not oid:
             return []
         
-        # 不使用 WBI 签名的评论接口
+        # 新接口参数
         params = {
             'oid': str(oid),
             'type': int(type_),
             'mode': 3,
-            'ps': 20,
-            'pn': 1
+            'pagination_str': json.dumps({'offset': ''}),
+            'plat': 1,
+            'seek_rpid': '',
+            'web_location': 1315875
         }
+        
+        # 使用WBI签名
+        signed_params = get_signed_params(params, cookie)
         
         headers = {
             'Cookie': cookie,
@@ -339,10 +344,10 @@ class PollingService:
             'Origin': 'https://www.bilibili.com'
         }
         
-        # 使用旧版评论接口（不需要WBI签名）
+        # 使用新版评论接口（需要WBI签名）
         resp = requests.get(
-            'https://api.bilibili.com/x/v2/reply',
-            params=params,
+            'https://api.bilibili.com/x/v2/reply/wbi/main',
+            params=signed_params,
             headers=headers,
             timeout=10
         )
@@ -353,13 +358,16 @@ class PollingService:
         
         replies = data.get('data', {}).get('replies') or []
         top = data.get('data', {}).get('top')
+        # top.upper 是UP主置顶评论，结构与replies中的项相同
         top_upper = top.get('upper') if top else None
         comments = []
         
+        # 处理置顶评论（UP主置顶）
         if top_upper:
             pinned = self._parse_reply(top_upper, cookie, oid, type_, is_pinned=True)
             comments.append(pinned)
         
+        # 处理普通评论
         for r in replies:
             comment = self._parse_reply(r, cookie, oid, type_)
             comments.append(comment)
