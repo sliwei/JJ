@@ -539,12 +539,6 @@ class PollingService:
     
     def _save_comment(self, comment: Dict, dynamic_id: str, parent_id: str = None) -> bool:
         """保存评论，返回是否为新评论"""
-        sql = "SELECT 1 FROM bi_comments WHERE comment_id = %s AND dynamic_id = %s"
-        exists = db.execute_query(sql, (comment['id'], dynamic_id), fetch_one=True)
-        
-        if exists:
-            return False
-        
         is_read = db.execute_query(
             "SELECT 1 FROM bi_read_ids WHERE item_id = %s",
             (comment['id'],), fetch_one=True
@@ -554,8 +548,12 @@ class PollingService:
             INSERT INTO bi_comments (comment_id, dynamic_id, parent_id, root_id, content,
                 timestamp, user_name, user_face, is_pinned, reply_count, is_read)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                reply_count = VALUES(reply_count),
+                is_pinned = VALUES(is_pinned),
+                content = VALUES(content)
         """
-        db.execute_modify(sql, (
+        affected_rows = db.execute_modify(sql, (
             comment['id'],
             dynamic_id,
             parent_id,
@@ -569,7 +567,8 @@ class PollingService:
             1 if is_read else 0
         ))
         
-        return True
+        # affected_rows = 1 表示新插入，affected_rows = 2 表示更新了已存在的记录
+        return affected_rows == 1
     
     def _send_dingtalk(self, type_: str, up_name: str, content: str, 
                        jump_url: str, timestamp: int, settings: Dict):

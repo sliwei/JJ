@@ -45,6 +45,9 @@ class DatabaseService:
             db_config['connect_timeout'] = 10  # 连接超时10秒
             db_config['read_timeout'] = 30      # 读取超时30秒
             db_config['write_timeout'] = 30     # 写入超时30秒
+            # 添加字符集配置，确保正确处理 UTF-8 编码
+            db_config['use_unicode'] = True
+            db_config['init_command'] = "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
             
             self._pool = PooledDB(
                 creator=pymysql,
@@ -122,6 +125,14 @@ class DatabaseService:
                 if fetch_one:
                     return cursor.fetchone()
                 return cursor.fetchall()
+        except UnicodeDecodeError as e:
+            # UTF-8 解码错误，可能是数据库中存在错误编码的数据
+            print(f"数据库查询UTF-8解码错误: {e}")
+            print(f"SQL: {sql[:200]}...")
+            print("⚠️ 数据库中可能存在错误编码的数据")
+            print("   建议：检查并修复数据库中的编码问题，或清理错误编码的记录")
+            # 返回空结果，避免程序崩溃
+            return None if fetch_one else []
         except Exception as e:
             print(f"数据库查询错误: {e}")
             print(f"SQL: {sql[:200]}...")  # 只打印前200个字符
