@@ -15,7 +15,7 @@ backlog = 2048
 workers = int(os.environ.get('GUNICORN_WORKERS', 2))
 worker_class = 'sync'
 worker_connections = 1000
-timeout = 120
+timeout = 180  # 增加到180秒，避免worker timeout（已优化查询，此配置作为额外保障）
 keepalive = 2
 
 # 重启策略

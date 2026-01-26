@@ -36,9 +36,9 @@ class Config:
     DB_NAME = os.environ.get('DB_NAME')
     
     # 数据库连接池配置
-    DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', 10))
+    DB_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', 20))  # 增加到20，避免连接池耗尽
     DB_POOL_MIN_CACHED = int(os.environ.get('DB_POOL_MIN_CACHED', 2))
-    DB_POOL_MAX_CACHED = int(os.environ.get('DB_POOL_MAX_CACHED', 5))
+    DB_POOL_MAX_CACHED = int(os.environ.get('DB_POOL_MAX_CACHED', 10))  # 增加到10
     
     @classmethod
     def get_db_config(cls) -> dict:

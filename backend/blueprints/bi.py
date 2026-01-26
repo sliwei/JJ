@@ -381,15 +381,8 @@ def search_up():
 
 # ============== Dynamics API ==============
 
-def get_comments_for_dynamic(dynamic_id: str) -> List[Dict]:
-    """获取动态的评论列表（包含嵌套回复）"""
-    sql = """
-        SELECT comment_id, dynamic_id, parent_id, root_id, content, timestamp,
-               user_name, user_face, is_pinned, reply_count, is_read
-        FROM bi_comments WHERE dynamic_id = %s ORDER BY timestamp
-    """
-    rows = db.execute_query(sql, (dynamic_id,))
-    
+def _build_comment_tree(rows: List[Dict]) -> List[Dict]:
+    """构建评论树结构（从评论列表构建嵌套回复）"""
     comments_map = {}
     root_comments = []
     
@@ -419,6 +412,54 @@ def get_comments_for_dynamic(dynamic_id: str) -> List[Dict]:
     return root_comments
 
 
+def get_comments_for_dynamic(dynamic_id: str) -> List[Dict]:
+    """获取动态的评论列表（包含嵌套回复）"""
+    sql = """
+        SELECT comment_id, dynamic_id, parent_id, root_id, content, timestamp,
+               user_name, user_face, is_pinned, reply_count, is_read
+        FROM bi_comments WHERE dynamic_id = %s ORDER BY timestamp
+    """
+    rows = db.execute_query(sql, (dynamic_id,))
+    return _build_comment_tree(rows)
+
+
+def get_comments_batch(dynamic_ids: List[str]) -> Dict[str, List[Dict]]:
+    """批量获取多个动态的评论列表（避免N+1查询问题）"""
+    if not dynamic_ids:
+        return {}
+    
+    # 使用 IN 查询一次性获取所有评论
+    placeholders = ','.join(['%s'] * len(dynamic_ids))
+    sql = f"""
+        SELECT comment_id, dynamic_id, parent_id, root_id, content, timestamp,
+               user_name, user_face, is_pinned, reply_count, is_read
+        FROM bi_comments 
+        WHERE dynamic_id IN ({placeholders})
+        ORDER BY dynamic_id, timestamp
+    """
+    rows = db.execute_query(sql, tuple(dynamic_ids))
+    
+    # 按 dynamic_id 分组
+    comments_by_dynamic = {}
+    for r in rows:
+        dynamic_id = r['dynamic_id']
+        if dynamic_id not in comments_by_dynamic:
+            comments_by_dynamic[dynamic_id] = []
+        comments_by_dynamic[dynamic_id].append(r)
+    
+    # 为每个动态构建评论树
+    result = {}
+    for dynamic_id, comment_rows in comments_by_dynamic.items():
+        result[dynamic_id] = _build_comment_tree(comment_rows)
+    
+    # 确保所有 dynamic_id 都有对应的空列表（即使没有评论）
+    for dynamic_id in dynamic_ids:
+        if dynamic_id not in result:
+            result[dynamic_id] = []
+    
+    return result
+
+
 @bi_bp.route('/dynamics', methods=['GET'])
 @require_token
 def get_dynamics():
@@ -429,21 +470,29 @@ def get_dynamics():
     
     try:
         mid = request.args.get('mid')
+        limit = request.args.get('limit', 100, type=int)
+        limit = min(max(limit, 1), 1000)  # 限制在1-1000之间
         
         if mid:
             sql = """
                 SELECT dynamic_id, mid, timestamp, title, description, cover, 
                        images, jump_url, comment_oid, comment_type, is_read
-                FROM bi_dynamics WHERE mid = %s ORDER BY timestamp DESC
+                FROM bi_dynamics WHERE mid = %s ORDER BY timestamp DESC LIMIT %s
             """
-            rows = db.execute_query(sql, (mid,))
+            rows = db.execute_query(sql, (mid, limit))
         else:
             sql = """
                 SELECT dynamic_id, mid, timestamp, title, description, cover, 
                        images, jump_url, comment_oid, comment_type, is_read
-                FROM bi_dynamics ORDER BY timestamp DESC LIMIT 100
+                FROM bi_dynamics ORDER BY timestamp DESC LIMIT %s
             """
-            rows = db.execute_query(sql)
+            rows = db.execute_query(sql, (limit,))
+        
+        # 收集所有 dynamic_id，用于批量查询评论
+        dynamic_ids = [r['dynamic_id'] for r in rows]
+        
+        # 批量获取所有评论（避免N+1查询问题）
+        comments_by_dynamic = get_comments_batch(dynamic_ids)
         
         dynamics = []
         for r in rows:
@@ -458,9 +507,9 @@ def get_dynamics():
                 'jumpUrl': r['jump_url'] or '',
                 'commentOid': r['comment_oid'] or '',
                 'commentType': r['comment_type'] or 0,
-                'isRead': bool(r['is_read'])
+                'isRead': bool(r['is_read']),
+                'comments': comments_by_dynamic.get(r['dynamic_id'], [])
             }
-            dynamic['comments'] = get_comments_for_dynamic(r['dynamic_id'])
             dynamics.append(dynamic)
         
         if not mid:
@@ -487,6 +536,10 @@ def get_dynamics_grouped():
         return err
     
     try:
+        # 获取限制数量（默认100，最大1000）
+        limit = request.args.get('limit', 100, type=int)
+        limit = min(max(limit, 1), 1000)  # 限制在1-1000之间
+        
         sql = """
             SELECT d.dynamic_id, d.mid, d.timestamp, d.title, d.description, d.cover, 
                    d.images, d.jump_url, d.comment_oid, d.comment_type, d.is_read,
@@ -494,9 +547,17 @@ def get_dynamics_grouped():
             FROM bi_dynamics d
             LEFT JOIN bi_ups u ON d.mid = u.mid
             ORDER BY d.timestamp DESC
+            LIMIT %s
         """
-        rows = db.execute_query(sql)
+        rows = db.execute_query(sql, (limit,))
         
+        # 收集所有 dynamic_id，用于批量查询评论
+        dynamic_ids = [r['dynamic_id'] for r in rows]
+        
+        # 批量获取所有评论（避免N+1查询问题）
+        comments_by_dynamic = get_comments_batch(dynamic_ids)
+        
+        # 构建分组结果
         grouped = {}
         for r in rows:
             mid = r['mid']
@@ -515,7 +576,7 @@ def get_dynamics_grouped():
                 'commentOid': r['comment_oid'] or '',
                 'commentType': r['comment_type'] or 0,
                 'isRead': bool(r['is_read']),
-                'comments': get_comments_for_dynamic(r['dynamic_id'])
+                'comments': comments_by_dynamic.get(r['dynamic_id'], [])
             }
             grouped[mid].append(dynamic)
         
