@@ -329,12 +329,22 @@ class PollingService:
         if not oid:
             return []
         
+        # 根据类型生成正确的 Referer URL
+        referer_map = {
+            1: f'https://www.bilibili.com/video/av{oid}',  # 视频
+            11: f'https://www.bilibili.com/opus/{oid}',    # 动态/图片
+            12: f'https://www.bilibili.com/read/cv{oid}',  # 文章
+            13: f'https://www.bilibili.com/opus/{oid}',   # 动态
+            17: f'https://t.bilibili.com/{oid}'            # 动态
+        }
+        referer = referer_map.get(int(type_), f'https://www.bilibili.com/opus/{oid}')
+        
         # 新接口参数
         params = {
             'oid': str(oid),
             'type': int(type_),
             'mode': 3,
-            'pagination_str': json.dumps({'offset': ''}),
+            'pagination_str': json.dumps({'offset': ''}, separators=(',', ':')),  # 去掉空格，确保格式与API一致
             'plat': 1,
             'seek_rpid': '',
             'web_location': 1315875
@@ -343,11 +353,22 @@ class PollingService:
         # 使用WBI签名
         signed_params = get_signed_params(params, cookie)
         
+        # 完整的请求头，模拟浏览器请求
         headers = {
             'Cookie': cookie,
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-            'Referer': 'https://www.bilibili.com',
-            'Origin': 'https://www.bilibili.com'
+            'Referer': referer,
+            'Origin': 'https://www.bilibili.com',
+            'Accept': '*/*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-site',
+            'Sec-Ch-Ua': '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"macOS"'
         }
         
         # 使用新版评论接口（需要WBI签名）
