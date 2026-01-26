@@ -176,9 +176,9 @@ class PollingService:
             dynamic_count = int(settings.get('comment_time_range', 5))
             
             sql = """
-                SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url
+                SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url, timestamp
                 FROM (
-                    SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url,
+                    SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url, timestamp,
                            ROW_NUMBER() OVER (PARTITION BY mid ORDER BY timestamp DESC) as rn
                     FROM bi_dynamics
                 ) ranked
