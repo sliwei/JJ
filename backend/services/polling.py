@@ -177,7 +177,13 @@ class PollingService:
             
             sql = """
                 SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url
-                FROM bi_dynamics ORDER BY timestamp DESC LIMIT %s
+                FROM (
+                    SELECT dynamic_id, mid, comment_oid, comment_type, title, description, jump_url,
+                           ROW_NUMBER() OVER (PARTITION BY mid ORDER BY timestamp DESC) as rn
+                    FROM bi_dynamics
+                ) ranked
+                WHERE rn <= %s
+                ORDER BY timestamp DESC
             """
             dynamics = db.execute_query(sql, (dynamic_count,))
             new_count = 0
