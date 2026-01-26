@@ -137,14 +137,25 @@ const CommentItem: FC<{
   const isUnread = isUp && !comment.isRead
 
   return (
-    <div className={`flex ${isSub ? 'mt-1.5 md:mt-2' : 'mt-2.5 md:mt-3'} ${isUnread ? 'bg-primary/5 p-1.5 md:p-2 rounded-lg border border-primary/20' : ''}`}>
-      <img src={comment.userFace} alt={comment.userName} className={`${isSub ? 'w-5 h-5' : 'w-6 md:w-7 h-6 md:h-7'} rounded-full mr-2 md:mr-2.5 shrink-0`} referrerPolicy="no-referrer" />
+    <div
+      className={`flex ${isSub ? 'mt-1.5 md:mt-2' : 'mt-2.5 md:mt-3'} ${isUnread ? 'bg-primary/5 p-1.5 md:p-2 rounded-lg border border-primary/20' : ''}`}
+    >
+      <img
+        src={comment.userFace}
+        alt={comment.userName}
+        className={`${isSub ? 'w-5 h-5' : 'w-6 md:w-7 h-6 md:h-7'} rounded-full mr-2 md:mr-2.5 shrink-0`}
+        referrerPolicy="no-referrer"
+      />
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap md:flex-nowrap justify-between mb-0.5 items-start gap-1">
           <div className="flex items-center gap-1 md:gap-1.5 flex-wrap">
-            <span className={`font-semibold ${isSub ? 'text-[0.7rem] md:text-[0.75rem]' : 'text-[0.75rem] md:text-[0.8rem]'}`}>{comment.userName}</span>
+            <span className={`font-semibold ${isSub ? 'text-[0.7rem] md:text-[0.75rem]' : 'text-[0.75rem] md:text-[0.8rem]'}`}>
+              {comment.userName}
+            </span>
             {comment.isPinned && (
-              <span className="text-[0.6rem] md:text-[0.65rem] text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary shrink-0">置顶</span>
+              <span className="text-[0.6rem] md:text-[0.65rem] text-primary bg-primary/10 px-1 py-0.5 rounded border border-primary shrink-0">
+                置顶
+              </span>
             )}
             {isUp && <span className="text-[0.6rem] md:text-[0.65rem] text-white bg-primary px-1 py-0.5 rounded shrink-0">UP</span>}
           </div>
@@ -182,7 +193,8 @@ const CommentItem: FC<{
 }
 
 const CommentSection: FC<CommentSectionProps> = ({ comments, upName, onMarkRead, onlyShowUP }) => {
-  if (!comments || comments.length === 0) return <div className="p-2 text-[0.7rem] md:text-[0.75rem] text-text-secondary">暂无评论或数据未更新</div>
+  if (!comments || comments.length === 0)
+    return <div className="p-2 text-[0.7rem] md:text-[0.75rem] text-text-secondary">暂无评论或数据未更新</div>
 
   // 过滤评论：只看UP时，只显示UP主的评论或包含UP主回复的评论
   const filteredComments = onlyShowUP
@@ -197,9 +209,14 @@ const CommentSection: FC<CommentSectionProps> = ({ comments, upName, onMarkRead,
     return <div className="p-2 text-[0.7rem] md:text-[0.75rem] text-text-secondary">该动态下暂无UP主的评论</div>
   }
 
+  // 将置顶评论放在最前面
+  const pinnedComments = filteredComments.filter((c) => c.isPinned)
+  const normalComments = filteredComments.filter((c) => !c.isPinned)
+  const allComments = [...pinnedComments, ...normalComments]
+
   return (
     <div className="px-3 md:px-4 pb-3 md:pb-4 border-t border-border bg-black/5 dark:bg-black/10">
-      {filteredComments.map((comment) => (
+      {allComments.map((comment) => (
         <CommentItem key={comment.id} comment={comment} upName={upName} onMarkRead={onMarkRead} onlyShowUP={onlyShowUP} />
       ))}
     </div>

@@ -1,5 +1,6 @@
+import { Moon, Plus, Settings as SettingsIcon, Sun, X } from 'lucide-react'
 import React from 'react'
-import { Settings as SettingsIcon, Plus, Moon, Sun, X } from 'lucide-react'
+
 import type { UP } from '../types'
 
 interface SidebarProps {
@@ -15,7 +16,18 @@ interface SidebarProps {
   onClose?: () => void
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ ups, activeMid, unreadCounts, onSelectUP, onOpenSettings, onAddUP, theme, onToggleTheme, isOpen, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  ups,
+  activeMid,
+  unreadCounts,
+  onSelectUP,
+  onOpenSettings,
+  onAddUP,
+  theme,
+  onToggleTheme,
+  isOpen,
+  onClose
+}) => {
   return (
     <>
       {/* 移动端遮罩层 */}
@@ -70,7 +82,12 @@ const Sidebar: React.FC<SidebarProps> = ({ ups, activeMid, unreadCounts, onSelec
               onClick={() => onSelectUP(up.mid)}
             >
               <div className="flex items-center overflow-hidden">
-                <img src={up.face} alt={up.name} className="w-9 md:w-8 h-9 md:h-8 rounded-full mr-2.5 object-cover shrink-0" referrerPolicy="no-referrer" />
+                <img
+                  src={up.face}
+                  alt={up.name}
+                  className="w-9 md:w-8 h-9 md:h-8 rounded-full mr-2.5 object-cover shrink-0"
+                  referrerPolicy="no-referrer"
+                />
                 <span className="font-medium text-[0.9rem] truncate">{up.name}</span>
               </div>
               {unreadCounts[up.mid] > 0 && (

@@ -1,6 +1,8 @@
 import './index.css'
 
+import { VideoIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 
 import Tooltip, { TOOLTIPS } from '@/components/Tooltip'
@@ -12,8 +14,6 @@ import Code from './components/Code/indx'
 import Settings from './components/Settings'
 import SimulationParams from './components/SimulationParams/indx'
 import TrendChart from './components/TrendChart'
-import { Link } from 'react-router'
-import { VideoIcon } from 'lucide-react'
 
 // 定义表单数据类型
 export interface FormData {

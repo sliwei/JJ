@@ -54,8 +54,8 @@ export default defineConfig(({ mode, command }) => {
       sourcemap: 'inline', // 更快的 sourcemap 生成方式
       proxy: {
         '/api': {
-          target: 'http://localhost:8080',
-          // target: 'https://jj.bstu.cn',
+          // target: 'http://localhost:8080',
+          target: 'https://jj.bstu.cn',
           changeOrigin: true
         }
       }

@@ -1,7 +1,7 @@
+import { md5 } from 'js-md5'
 import { Eye, EyeOff, Loader2, Lock, User } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { md5 } from 'js-md5';
 
 interface LoginModalProps {
   onLoginSuccess: (user: { id: number; name: string; username: string }) => void
@@ -127,4 +127,3 @@ export default function LoginModal({ onLoginSuccess }: LoginModalProps) {
     </div>
   )
 }
-

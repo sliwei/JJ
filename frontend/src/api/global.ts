@@ -33,9 +33,7 @@ export interface FundListRes {
 }
 
 export const getFundList = (query: string) => {
-  return request.get<Res<FundListRes>, Res<FundListRes>>(
-    `/api/fund_list?query=${encodeURIComponent(query)}&limit=10`
-  )
+  return request.get<Res<FundListRes>, Res<FundListRes>>(`/api/fund_list?query=${encodeURIComponent(query)}&limit=10`)
 }
 
 export interface FundDataItem {

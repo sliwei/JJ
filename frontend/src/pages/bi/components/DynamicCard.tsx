@@ -64,7 +64,9 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
         <div className="flex items-center gap-1.5 md:gap-2">
           <span className="hidden md:inline">{formattedTime}</span>
           <span className="md:hidden">{dayjs(dynamic.timestamp * 1000).format('MM-DD HH:mm')}</span>
-          {isDynamicUnread && <span className="text-primary font-bold text-[0.65rem] md:text-[0.7rem] bg-primary/10 px-1 md:px-1.5 rounded">NEW</span>}
+          {isDynamicUnread && (
+            <span className="text-primary font-bold text-[0.65rem] md:text-[0.7rem] bg-primary/10 px-1 md:px-1.5 rounded">NEW</span>
+          )}
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           {isDynamicUnread && onMarkRead && (
@@ -82,7 +84,8 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
             className="flex items-center text-text-secondary hover:text-primary! transition-colors relative cursor-pointer"
           >
             <MessageSquare size={12} className="mr-0.5 md:mr-1" />
-            <span className="hidden md:inline">评论</span>{allCommentCount}
+            <span className="hidden md:inline">评论</span>
+            {allCommentCount}
             {unreadCommentCount > 0 && (
               <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[0.6rem] px-1 rounded-full min-w-3.5 text-center h-3.5 leading-tight flex items-center justify-center">
                 {unreadCommentCount}
@@ -98,7 +101,12 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
               className="relative group cursor-zoom-in aspect-video rounded-md overflow-hidden bg-black/5 dark:bg-black/20"
               onClick={(e) => openPreview(e, 0)}
             >
-              <img src={images[0]} alt="preview" className="w-full h-full object-cover transition-opacity group-hover:opacity-80" referrerPolicy="no-referrer" />
+              <img
+                src={images[0]}
+                alt="preview"
+                className="w-full h-full object-cover transition-opacity group-hover:opacity-80"
+                referrerPolicy="no-referrer"
+              />
               {images.length > 1 && (
                 <div className="absolute right-1 bottom-1 px-1 py-0.5 bg-black/60 text-white text-[0.6rem] rounded backdrop-blur-sm">
                   {images.length}张
@@ -115,9 +123,7 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
             {dynamic.title}
           </h3>
           {dynamic.description && (
-            <div className="text-text-secondary text-[0.75rem] md:text-[0.8rem] line-clamp-3 md:line-clamp-none">
-              {dynamic.description}
-            </div>
+            <div className="text-text-secondary text-[0.75rem] md:text-[0.8rem] line-clamp-3 md:line-clamp-none">{dynamic.description}</div>
           )}
           <div onClick={() => setShowComments(!showComments)} className="cursor-pointer flex-1"></div>
         </div>

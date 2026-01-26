@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import React, { useState } from 'react'
+
 import Modal from './Modal'
 
 interface ImagePreviewProps {
