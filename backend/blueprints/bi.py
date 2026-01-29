@@ -636,6 +636,59 @@ def check_read_status(item_id: str):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@bi_bp.route('/read/dynamic/<dynamic_id>/comments', methods=['POST'])
+@require_token
+def mark_dynamic_comments_as_read(dynamic_id: str):
+    """标记指定动态下的所有评论为已读"""
+    err = _check_db()
+    if err:
+        return err
+    
+    try:
+        # 查询该动态下的所有评论ID（包括嵌套回复）
+        sql = "SELECT comment_id FROM bi_comments WHERE dynamic_id = %s"
+        comment_rows = db.execute_query(sql, (dynamic_id,))
+        
+        if not comment_rows:
+            return jsonify({'success': True, 'message': '该动态下暂无评论'})
+        
+        # 收集所有评论ID
+        comment_ids = [row['comment_id'] for row in comment_rows]
+        
+        # 批量插入已读记录到 bi_read_ids 表
+        if comment_ids:
+            # 构建批量插入SQL
+            placeholders = ','.join(['(%s, %s)'] * len(comment_ids))
+            values = []
+            for comment_id in comment_ids:
+                values.extend([comment_id, 'comment'])
+            
+            sql = f"""
+                INSERT INTO bi_read_ids (item_id, item_type)
+                VALUES {placeholders}
+                ON DUPLICATE KEY UPDATE item_id = item_id
+            """
+            db.execute_modify(sql, tuple(values))
+            
+            # 批量更新 bi_comments 表的 is_read 字段
+            placeholders = ','.join(['%s'] * len(comment_ids))
+            sql = f"""
+                UPDATE bi_comments 
+                SET is_read = 1 
+                WHERE comment_id IN ({placeholders})
+            """
+            db.execute_modify(sql, tuple(comment_ids))
+        
+        return jsonify({
+            'success': True, 
+            'message': f'已标记 {len(comment_ids)} 条评论为已读'
+        })
+    except Exception as e:
+        print(f"批量标记评论已读失败: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ============== 健康检查 ==============
 
 @bi_bp.route('/health', methods=['GET'])

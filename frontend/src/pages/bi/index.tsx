@@ -106,6 +106,27 @@ export function Component() {
     })
   }
 
+  /** 一键已读某动态下所有评论后的本地状态更新（API 由 DynamicCard 内调用） */
+  const handleCommentsMarkedRead = (dynamicId: string) => {
+    const markAllCommentsRead = (comments: Comment[]): Comment[] =>
+      comments.map((c) => ({
+        ...c,
+        isRead: true,
+        ...(c.replies?.length ? { replies: markAllCommentsRead(c.replies) } : {})
+      }))
+
+    setDynamicsMap((prev) => {
+      const next = { ...prev }
+      for (const mid in next) {
+        next[mid] = next[mid].map((d) =>
+          d.id === dynamicId && d.comments?.length ? { ...d, comments: markAllCommentsRead(d.comments) } : d
+        )
+      }
+      saveStoredDynamics(next)
+      return next
+    })
+  }
+
   const activeUP = ups.find((u) => u.mid === activeMid)
 
   const unreadCounts = useMemo(() => {
@@ -203,7 +224,14 @@ export function Component() {
               <div key={up.mid} style={{ display: isActive ? 'block' : 'none' }} className="w-full">
                 {upDynamics.length > 0 ? (
                   upDynamics.map((dyn) => (
-                    <DynamicCard key={dyn.id} dynamic={dyn} upName={up.name} onMarkRead={handleMarkRead} onlyShowUP={onlyShowUP} />
+                    <DynamicCard
+                      key={dyn.id}
+                      dynamic={dyn}
+                      upName={up.name}
+                      onMarkRead={handleMarkRead}
+                      onCommentsMarkedRead={handleCommentsMarkedRead}
+                      onlyShowUP={onlyShowUP}
+                    />
                   ))
                 ) : (
                   <div className="text-center mt-20 text-text-secondary text-sm">暂无动态，请检查设置并确保轮询已开启</div>

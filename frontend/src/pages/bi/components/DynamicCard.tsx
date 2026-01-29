@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { CheckCircle, MessageSquare } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
+import { markDynamicCommentsAsReadOnBackend } from '../lib/api-backend'
 import type { Comment, DynamicContent } from '../types'
 import CommentSection from './CommentSection'
 import ImagePreview from './ImagePreview'
@@ -10,13 +11,16 @@ interface DynamicCardProps {
   dynamic: DynamicContent
   upName?: string
   onMarkRead?: (id: string, isDynamic?: boolean) => void
+  /** 一键已读该动态下所有评论后调用，仅用于本地状态更新（不发起 API） */
+  onCommentsMarkedRead?: (dynamicId: string) => void
   onlyShowUP?: boolean
 }
 
-const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, onlyShowUP }) => {
+const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, onCommentsMarkedRead, onlyShowUP }) => {
   const [showComments, setShowComments] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [currentImgIndex, setCurrentImgIndex] = useState(0)
+  const [isMarkingRead, setIsMarkingRead] = useState(false)
 
   const images = dynamic.cover ? [dynamic.cover, ...dynamic.images] : dynamic.images
   const formattedTime = dayjs(dynamic.timestamp * 1000).format('YYYY年MM月DD日 HH时mm分ss秒')
@@ -46,6 +50,20 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
   const handleTitleClick = () => {
     window.open(dynamic.jumpUrl, '_blank')
     handleMarkRead()
+  }
+
+  const handleMarkAllCommentsRead = async () => {
+    if (isMarkingRead || unreadCommentCount === 0) return
+
+    setIsMarkingRead(true)
+    try {
+      await markDynamicCommentsAsReadOnBackend(dynamic.id)
+      onCommentsMarkedRead?.(dynamic.id)
+    } catch (error) {
+      console.error('标记评论已读失败:', error)
+    } finally {
+      setIsMarkingRead(false)
+    }
   }
 
   const allCommentCount = useMemo(() => {
@@ -96,6 +114,17 @@ const DynamicCard: React.FC<DynamicCardProps> = ({ dynamic, upName, onMarkRead, 
               </span>
             )}
           </button>
+          {unreadCommentCount > 0 && (
+            <button
+              onClick={handleMarkAllCommentsRead}
+              disabled={isMarkingRead}
+              className="flex items-center text-text-secondary hover:text-primary! transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="一键已读"
+            >
+              <CheckCircle size={12} className={`mr-0.5 md:mr-1 ${isMarkingRead ? 'animate-spin' : ''}`} />
+              <span className="hidden md:inline">已读</span>
+            </button>
+          )}
         </div>
       </div>
       <div className="flex flex-col md:flex-row p-3 md:p-4">

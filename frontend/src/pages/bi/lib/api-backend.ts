@@ -154,6 +154,15 @@ export async function checkReadStatusOnBackend(id: string): Promise<boolean> {
   return handleResponse(resp)
 }
 
+export async function markDynamicCommentsAsReadOnBackend(dynamicId: string): Promise<void> {
+  checkAuth()
+  const resp = await fetch(`${API_BASE}/read/dynamic/${dynamicId}/comments`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  })
+  await handleResponse(resp)
+}
+
 // ============== Health Check ==============
 
 export async function checkBackendHealth(): Promise<boolean> {
