@@ -65,7 +65,7 @@ export default function LoginModal({ onLoginSuccess }: LoginModalProps) {
               <span className="text-2xl font-bold text-white">B</span>
             </div>
             <h1 className="text-2xl font-bold text-text-primary">Bili Monitor</h1>
-            <p className="text-sm text-text-secondary mt-2">请登录以继续使用</p>
+            <p className="text-sm text-text-secondary mt-2">请登录以后继续使用</p>
           </div>
 
           {/* 登录表单 */}
